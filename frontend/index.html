@@ -1,0 +1,28 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ADA Market Intelligence</title><link rel="stylesheet" href="/static/css/app.css"></head>
+<body>
+<aside><div class="brand">▲ <span>ADA Market Intelligence</span><b>AI</b></div>
+<div class="sub">AI Powered Market Prediction</div>
+<nav><a class="active">▦ Dashboard</a><a>◈ Prediction</a><a>⌁ Live Market</a><a>▤ News & Sentiment</a><a>▦ Options Chain</a><a>◎ Global Markets</a><a>◫ Stock Heatmap</a><a>♧ Alerts</a><a>◷ History & Accuracy</a><a>⚙ Settings</a></nav>
+<div class="sidebox"><small>MARKET STATUS</small><p><i></i> Engine Running</p><p>Mode <strong id="mode">...</strong></p><p>Refresh <strong>3 sec</strong></p></div>
+<div class="sidebox"><small>DATA SOURCE</small><p>Groww / Demo <strong id="source">...</strong></p><p>News Engine <strong>Ready</strong></p><p>Database <strong>Connected</strong></p></div>
+</aside>
+<main>
+<header><span><i></i> Live Engine</span><span id="clock"></span><span class="pill">Prediction cycle: 3m</span></header>
+<section class="grid top">
+<div class="card index"><h3>NIFTY 50</h3><div class="price" id="niftyPrice">--</div><div class="state" id="niftyState">WARMING UP</div><div class="mini"><span>Support <b id="niftySupport">--</b></span><span>Resistance <b id="niftyResistance">--</b></span></div></div>
+<div class="card index"><h3>SENSEX</h3><div class="price" id="sensexPrice">--</div><div class="state" id="sensexState">WARMING UP</div><div class="mini"><span>Support <b id="sensexSupport">--</b></span><span>Resistance <b id="sensexResistance">--</b></span></div></div>
+<div class="card prediction"><h3>AI PREDICTION SUMMARY <em>EXPERIMENTAL</em></h3><table><thead><tr><th>Time</th><th>UP</th><th>DOWN</th><th>SIDEWAYS</th><th>Confidence</th></tr></thead><tbody id="predRows"></tbody></table><div class="verdict">AI VERDICT: <b id="verdict">NO-TRADE</b><span id="confirm">MIXED</span></div></div>
+</section>
+<section class="grid middle">
+<div class="card chart"><div class="cardhead"><h3>NIFTY 50 — LIVE TRACE</h3><span>1m engine</span></div><canvas id="chart"></canvas><div class="warning">V1 probabilities are heuristic shadow forecasts. Validate accuracy before trusting them.</div></div>
+<div class="card analysis"><h3>MARKET ANALYSIS</h3><div id="analysisRows"></div></div>
+<div class="card news"><h3>NEWS & SENTIMENT</h3><div class="newsScore">Current score <b id="newsScore">0.000</b></div><form id="newsForm"><input id="headline" placeholder="Add breaking headline for analysis"><select id="sentiment"><option>neutral</option><option>positive</option><option>negative</option></select><button>Add</button></form><div id="newsList"></div></div>
+</section>
+<section class="grid bottom">
+<div class="card"><h3>PREDICTION ACCURACY</h3><div id="accuracy">Waiting for predictions to mature...</div></div>
+<div class="card"><h3>RECENT AI ALERTS</h3><div id="alerts">No meaningful state change yet.</div></div>
+<div class="card"><h3>SYSTEM</h3><div id="system">Connecting...</div></div>
+</section>
+<footer>Market analysis only — not a guaranteed trade signal. No automatic order placement in V1.</footer>
+</main><script src="/static/js/app.js"></script></body></html>

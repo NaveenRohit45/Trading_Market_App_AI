@@ -1,0 +1,505 @@
+const $ = id => document.getElementById(id);
+
+const trace = [];
+let ws;
+
+
+function fmt(x) {
+
+    if (
+        x === null ||
+        x === undefined ||
+        Number.isNaN(Number(x))
+    ) {
+        return '--';
+    }
+
+    return Number(x).toLocaleString(
+        'en-IN',
+        {
+            maximumFractionDigits: 2
+        }
+    );
+}
+
+
+function stateClass(s) {
+
+    return s === 'BULLISH'
+        ? 'up'
+        : s === 'BEARISH'
+        ? 'down'
+        : 'sideways';
+}
+
+
+function renderFeedError(d) {
+
+    const errorMessage =
+        d.error || 'Groww live feed unavailable';
+
+    $('mode').textContent = 'GROWW ERROR';
+    $('source').textContent = 'LIVE FEED ERROR';
+
+    $('niftyPrice').textContent = '--';
+    $('sensexPrice').textContent = '--';
+
+    $('niftyState').textContent = 'LIVE FEED ERROR';
+    $('sensexState').textContent = 'LIVE FEED ERROR';
+
+    $('niftyState').className = 'state down';
+    $('sensexState').className = 'state down';
+
+    $('niftySupport').textContent = '--';
+    $('niftyResistance').textContent = '--';
+
+    $('sensexSupport').textContent = '--';
+    $('sensexResistance').textContent = '--';
+
+    $('predRows').innerHTML = `
+        <tr>
+            <td colspan="5" class="down">
+                LIVE FEED ERROR — waiting for real Groww data
+            </td>
+        </tr>
+    `;
+
+    $('verdict').textContent = 'NO LIVE DATA';
+    $('verdict').className = 'down';
+
+    $('confirm').textContent = 'FEED ERROR';
+
+    $('analysisRows').innerHTML = `
+        <div class="row">
+            <span>Market Feed</span>
+            <b class="down">OFFLINE</b>
+        </div>
+
+        <div class="row">
+            <span>Provider</span>
+            <b>GROWW</b>
+        </div>
+
+        <div class="row">
+            <span>Live Snapshot</span>
+            <b class="down">NOT RECEIVED</b>
+        </div>
+    `;
+
+    $('system').innerHTML = `
+        Mode: <b>GROWW</b><br>
+        WebSocket: <b class="up">Connected</b><br>
+        Live feed: <b class="down">ERROR</b><br>
+        <span class="down">${errorMessage}</span>
+    `;
+
+    trace.length = 0;
+
+    draw();
+}
+
+
+function render(d) {
+
+    if (!d) {
+        return;
+    }
+
+
+    // --------------------------------------------------
+    // NEVER DISPLAY GROWW AS LIVE WITHOUT REAL SNAPSHOT
+    // --------------------------------------------------
+
+    if (
+        d.live !== true ||
+        d.status !== 'LIVE' ||
+        !d.prices ||
+        !d.prices.NIFTY ||
+        !d.prices.SENSEX ||
+        !d.analysis ||
+        !d.analysis.NIFTY ||
+        !d.analysis.SENSEX
+    ) {
+
+        renderFeedError(d);
+
+        return;
+    }
+
+
+    // --------------------------------------------------
+    // REAL GROWW LIVE SNAPSHOT CONFIRMED
+    // --------------------------------------------------
+
+    $('mode').textContent = 'GROWW LIVE';
+    $('source').textContent = 'GROWW LIVE';
+
+    for (
+        const [key, id]
+        of [
+            ['NIFTY', 'nifty'],
+            ['SENSEX', 'sensex']
+        ]
+    ) {
+
+        const a = d.analysis[key];
+
+        $(id + 'Price').textContent =
+            fmt(a.price);
+
+        $(id + 'State').textContent =
+            a.state + ' · ' + a.regime;
+
+        $(id + 'State').className =
+            'state ' + stateClass(a.state);
+
+        $(id + 'Support').textContent =
+            fmt(a.support);
+
+        $(id + 'Resistance').textContent =
+            fmt(a.resistance);
+    }
+
+
+    const f = d.forecast.NIFTY || [];
+
+    $('predRows').innerHTML = f.map(
+        x => `
+            <tr>
+                <td>${x.horizon} Minutes</td>
+                <td class="up">${x.probabilities.UP}%</td>
+                <td class="down">${x.probabilities.DOWN}%</td>
+                <td class="sideways">${x.probabilities.SIDEWAYS}%</td>
+                <td>${x.confidence}%</td>
+            </tr>
+        `
+    ).join('');
+
+
+    $('verdict').textContent =
+        d.combined.verdict;
+
+    $('verdict').className =
+        stateClass(
+            d.combined.verdict
+        );
+
+    $('confirm').textContent =
+        d.combined.confirmation;
+
+
+    const a = d.analysis.NIFTY;
+    const b = d.analysis.SENSEX;
+
+
+    $('analysisRows').innerHTML = [
+
+        ['NIFTY RSI', a.rsi],
+
+        [
+            'NIFTY Breakout',
+            a.breakout
+        ],
+
+        ['NIFTY ATR', a.atr],
+
+        ['SENSEX RSI', b.rsi],
+
+        [
+            'SENSEX Breakout',
+            b.breakout
+        ],
+
+        [
+            'Index Confirmation',
+            d.combined.confirmation
+        ],
+
+        [
+            'News Score',
+            d.news_score
+        ]
+
+    ].map(
+        r => `
+            <div class="row">
+                <span>${r[0]}</span>
+                <b>${r[1]}</b>
+            </div>
+        `
+    ).join('');
+
+
+    $('newsScore').textContent =
+        d.news_score;
+
+
+    $('newsList').innerHTML = (
+        d.news || []
+    ).map(
+        n => `
+            <div class="newsitem">
+
+                ${n.headline}
+
+                <b class="${
+                    n.sentiment === 'positive'
+                        ? 'up'
+                        : n.sentiment === 'negative'
+                        ? 'down'
+                        : 'sideways'
+                }">
+
+                    ${n.sentiment}
+
+                </b>
+
+            </div>
+        `
+    ).join('') || 'No news added yet.';
+
+
+    $('alerts').innerHTML = (
+        d.alerts || []
+    ).map(
+        a => `
+            <div class="alert">
+                <b>${a.title}</b>
+                <br>
+                ${a.message}
+            </div>
+        `
+    ).join('') || 'No meaningful state change yet.';
+
+
+    $('system').innerHTML = `
+        Mode: <b>GROWW</b><br>
+        WebSocket: <b class="up">Connected</b><br>
+        Live feed: <b class="up">CONNECTED</b><br>
+        Experimental forecasts: <b>${d.experimental}</b>
+    `;
+
+
+    trace.push(
+        a.price
+    );
+
+    if (
+        trace.length > 120
+    ) {
+        trace.shift();
+    }
+
+    draw();
+}
+
+
+function draw() {
+
+    const c = $('chart');
+
+    const r =
+        devicePixelRatio || 1;
+
+    const w =
+        c.clientWidth;
+
+    const h =
+        c.clientHeight;
+
+    c.width = w * r;
+    c.height = h * r;
+
+    const x =
+        c.getContext('2d');
+
+    x.scale(r, r);
+
+    x.clearRect(
+        0,
+        0,
+        w,
+        h
+    );
+
+    if (
+        trace.length < 2
+    ) {
+        return;
+    }
+
+    let lo =
+        Math.min(...trace);
+
+    let hi =
+        Math.max(...trace);
+
+    let pad =
+        (hi - lo || 1) * .15;
+
+    lo -= pad;
+    hi += pad;
+
+    x.strokeStyle =
+        '#32d6a0';
+
+    x.lineWidth = 2;
+
+    x.beginPath();
+
+    trace.forEach(
+        (v, i) => {
+
+            let px =
+                i /
+                (trace.length - 1)
+                * w;
+
+            let py =
+                h -
+                (v - lo) /
+                (hi - lo)
+                * h;
+
+            i
+                ? x.lineTo(px, py)
+                : x.moveTo(px, py);
+        }
+    );
+
+    x.stroke();
+}
+
+
+async function accuracy() {
+
+    let a = await fetch(
+        '/api/accuracy'
+    ).then(
+        r => r.json()
+    );
+
+    $('accuracy').innerHTML =
+        a.length
+            ? a.map(
+                x => `
+                    <div class="analysis row">
+                        ${x.symbol}
+                        ${x.horizon}m:
+                        <b>${x.accuracy}%</b>
+                        (${x.count})
+                    </div>
+                `
+            ).join('')
+            : 'Waiting for predictions to mature...';
+}
+
+
+function connect() {
+
+    ws = new WebSocket(
+        `ws://${location.host}/ws`
+    );
+
+
+    ws.onmessage = e => {
+
+        render(
+            JSON.parse(
+                e.data
+            )
+        );
+
+    };
+
+
+    ws.onopen = () => {
+
+        ws.send(
+            'ready'
+        );
+
+    };
+
+
+    ws.onclose = () => {
+
+        $('system').innerHTML = `
+            WebSocket:
+            <b class="down">
+                DISCONNECTED
+            </b>
+        `;
+
+        setTimeout(
+            connect,
+            1500
+        );
+
+    };
+
+}
+
+
+$('newsForm').onsubmit =
+    async e => {
+
+        e.preventDefault();
+
+        await fetch(
+            '/api/news',
+            {
+                method: 'POST',
+
+                headers: {
+                    'Content-Type':
+                        'application/json'
+                },
+
+                body: JSON.stringify(
+                    {
+                        headline:
+                            $('headline').value,
+
+                        sentiment:
+                            $('sentiment').value,
+
+                        impact: .7,
+
+                        source: 'manual'
+                    }
+                )
+            }
+        );
+
+        $('headline').value = '';
+    };
+
+
+setInterval(
+    () => {
+
+        $('clock').textContent =
+            new Date()
+                .toLocaleTimeString(
+                    'en-IN'
+                )
+            + ' IST';
+
+    },
+    1000
+);
+
+
+setInterval(
+    accuracy,
+    15000
+);
+
+
+window.onresize = draw;
+
+
+connect();
+
+accuracy();
