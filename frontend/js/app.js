@@ -93,11 +93,149 @@ function renderFeedError(d) {
         <span class="down">${errorMessage}</span>
     `;
 
+    // RESET PRICE ACTION PANEL
+    renderPriceAction(d);
     trace.length = 0;
 
     draw();
 }
 
+function renderPriceAction(d) {
+
+    const brain =
+        d.brains?.price_action;
+
+    if (!brain) {
+
+        $('priceActionStatus').textContent =
+            'WAITING FOR LIVE MARKET';
+
+        $('niftyBrain').innerHTML =
+            'Waiting for real candle data...';
+
+        $('sensexBrain').innerHTML =
+            'Waiting for real candle data...';
+
+        return;
+    }
+
+
+    function renderBrain(symbol) {
+
+        const b = brain[symbol];
+
+        if (!b) {
+            return 'No brain data available.';
+        }
+
+
+        if (b.status === 'WARMING_UP') {
+
+            return `
+                <div class="brain-direction sideways">
+                    WARMING UP
+                </div>
+
+                <div class="brain-note">
+                    Collecting enough real 1-minute candles...
+                </div>
+            `;
+        }
+
+
+        const directionClass =
+            b.direction === 'BULLISH'
+                ? 'up'
+                : b.direction === 'BEARISH'
+                ? 'down'
+                : 'sideways';
+
+
+        const reasons = (
+            b.reasons || []
+        ).map(
+            reason => `
+                <div class="brain-reason">
+                    ✓ ${reason}
+                </div>
+            `
+        ).join('');
+
+
+        const contradictions = (
+            b.contradictions || []
+        ).map(
+            item => `
+                <div class="brain-warning">
+                    ⚠ ${item}
+                </div>
+            `
+        ).join('');
+
+
+        return `
+            <div class="brain-direction ${directionClass}">
+                ${b.direction}
+            </div>
+
+            <div class="brain-stats">
+
+                <span>
+                    Confidence
+                    <b>${b.confidence}%</b>
+                </span>
+
+                <span>
+                    Score
+                    <b>${b.score > 0 ? '+' : ''}${b.score}</b>
+                </span>
+
+                <span>
+                    Structure
+                    <b>${b.structure || 'MIXED'}</b>
+                </span>
+
+                <span>
+                    Invalidation
+                    <b>${fmt(b.invalidation)}</b>
+                </span>
+
+            </div>
+
+            <div class="brain-list">
+
+                <small>WHY</small>
+
+                ${
+                    reasons ||
+                    '<div class="brain-note">No strong reason yet.</div>'
+                }
+
+            </div>
+
+            <div class="brain-list">
+
+                <small>CONTRADICTIONS</small>
+
+                ${
+                    contradictions ||
+                    '<div class="brain-note">No contradiction detected.</div>'
+                }
+
+            </div>
+        `;
+    }
+
+
+    $('priceActionStatus').textContent =
+        'LIVE · 1M PRICE ACTION';
+
+    $('niftyBrain').innerHTML =
+        renderBrain('NIFTY');
+
+    $('sensexBrain').innerHTML =
+        renderBrain('SENSEX');
+}
 
 function render(d) {
 
@@ -228,6 +366,8 @@ function render(d) {
             </div>
         `
     ).join('');
+
+    renderPriceAction(d);
 
 
     $('newsScore').textContent =

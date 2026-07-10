@@ -10,6 +10,7 @@ from backend.prediction.prediction_engine import predict, combined_verdict
 from backend.services.database import Database
 from backend.data.demo_provider import DemoProvider
 from backend.data.groww_provider import GrowwProvider
+from backend.brains.price_action_brain import PriceActionBrain
 
 
 class MarketService:
@@ -21,7 +22,7 @@ class MarketService:
             if settings.app_mode == "GROWW"
             else DemoProvider()
         )
-
+        self.price_action_brain = PriceActionBrain()
         self.engine = CandleEngine()
         self.news = NewsAnalyzer()
         self.db = Database(settings.db_path)
@@ -241,12 +242,19 @@ class MarketService:
         # Only genuine live prices enter CandleEngine.
         for symbol, price in prices.items():
 
-            self.engine.add_tick(
-                symbol,
-                price,
-                now,
-                60,
-            )
+            # BUILD REAL MULTI-TIMEFRAME CANDLES
+            for interval in (
+                    60,  # 1 minute
+                    120,  # 2 minutes
+                    180,  # 3 minutes
+                    300,  # 5 minutes
+            ):
+                self.engine.add_tick(
+                    symbol,
+                    price,
+                    now,
+                    interval,
+                )
 
 
         # Only genuine live prices resolve predictions.
@@ -497,7 +505,48 @@ class MarketService:
                 "SENSEX",
             )
         }
+        price_action = {
+            symbol: self.price_action_brain.analyze(
+                symbol=symbol,
 
+                candles={
+                    "1m": self.engine.series(
+                        symbol,
+                        60,
+                    ),
+
+                    "2m": self.engine.series(
+                        symbol,
+                        120,
+                    ),
+
+                    "3m": self.engine.series(
+                        symbol,
+                        180,
+                    ),
+
+                    "5m": self.engine.series(
+                        symbol,
+                        300,
+                    ),
+                },
+            )
+            for symbol in (
+                "NIFTY",
+                "SENSEX",
+            )
+        }
+
+        # ADD THE PRINT HERE
+        print(
+            "🧠 PRICE ACTION |",
+            "NIFTY:",
+            price_action["NIFTY"]["direction"],
+            price_action["NIFTY"]["confidence"],
+            "| SENSEX:",
+            price_action["SENSEX"]["direction"],
+            price_action["SENSEX"]["confidence"],
+        )
 
         news_score = self.news.score()
 
@@ -542,6 +591,11 @@ class MarketService:
             "prices": prices,
 
             "analysis": analyses,
+
+            "brains": {
+                "price_action": price_action,
+            },
+
             "forecast": forecasts,
 
             "combined": combined_verdict(
