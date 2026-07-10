@@ -1,4 +1,4 @@
-# ADA Market Intelligence V1
+# Trading_Market_App_AI
 
 A complete local **analysis + shadow-prediction** application for NIFTY 50 and SENSEX.
 

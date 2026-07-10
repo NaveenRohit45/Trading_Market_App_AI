@@ -1,4 +1,3 @@
-
 import asyncio
 import time
 from collections import deque
@@ -29,8 +28,6 @@ class MarketService:
 
         self.clients = set()
 
-        # IMPORTANT:
-        # Never preload or preserve old/demo market data.
         self.latest = {}
 
         self.last_prediction = 0
@@ -53,18 +50,20 @@ class MarketService:
 
         self.running = True
 
-        # Start the background loop first.
-        # Groww live-feed failure must NOT kill FastAPI startup.
         self.loop_task = asyncio.create_task(
             self.loop()
         )
 
-        print("✅ Market service background loop started")
+        print(
+            "✅ Market service background loop started"
+        )
 
 
     async def stop(self):
 
-        print("Stopping ADA Market Service...")
+        print(
+            "Stopping ADA Market Service..."
+        )
 
         self.running = False
 
@@ -73,14 +72,18 @@ class MarketService:
             self.loop_task.cancel()
 
             try:
+
                 await self.loop_task
 
             except asyncio.CancelledError:
+
                 pass
 
         await self.provider.stop()
 
-        print("🛑 ADA Market Service stopped")
+        print(
+            "🛑 ADA Market Service stopped"
+        )
 
 
     async def loop(self):
@@ -92,103 +95,69 @@ class MarketService:
                 now = time.time()
 
                 # --------------------------------------------------
-                # GET REAL MARKET PRICES
+                # GET PROVIDER SNAPSHOT
                 # --------------------------------------------------
 
-                prices = await self.provider.get_prices()
-
-                # --------------------------------------------------
-                # VALIDATE LIVE SNAPSHOT
-                # --------------------------------------------------
-
-                if not isinstance(prices, dict):
-
-                    raise RuntimeError(
-                        "Live provider returned invalid price data"
-                    )
-
-                if "NIFTY" not in prices:
-
-                    raise RuntimeError(
-                        "NIFTY missing from live Groww snapshot"
-                    )
-
-                if "SENSEX" not in prices:
-
-                    raise RuntimeError(
-                        "SENSEX missing from live Groww snapshot"
-                    )
-
-                nifty_price = float(
-                    prices["NIFTY"]
+                provider_snapshot = (
+                    await self.provider.get_prices()
                 )
 
-                sensex_price = float(
-                    prices["SENSEX"]
-                )
 
-                if nifty_price <= 0:
-
-                    raise RuntimeError(
-                        "Invalid NIFTY live price"
-                    )
-
-                if sensex_price <= 0:
-
-                    raise RuntimeError(
-                        "Invalid SENSEX live price"
-                    )
-
-                prices = {
-                    "NIFTY": nifty_price,
-                    "SENSEX": sensex_price,
-                }
-
-                # --------------------------------------------------
-                # REAL LIVE DATA CONFIRMED
-                # --------------------------------------------------
-
-                self.error = None
-
-                for symbol, price in prices.items():
-
-                    self.engine.add_tick(
-                        symbol,
-                        price,
-                        now,
-                        60,
-                    )
-
-                self.db.resolve(
-                    now,
-                    prices,
-                )
-
-                self.latest = self.build_snapshot(
-                    prices,
-                    now,
-                )
-
-                if (
-                    now - self.last_prediction
-                    >= settings.prediction_interval_seconds
+                if not isinstance(
+                    provider_snapshot,
+                    dict,
                 ):
 
-                    self.store_predictions(now)
+                    raise RuntimeError(
+                        "Groww provider returned invalid data"
+                    )
 
-                    self.last_prediction = now
 
-                self.detect_alert(now)
-
-                await self.broadcast(
-                    self.latest
+                status = provider_snapshot.get(
+                    "status"
                 )
 
-                print(
-                    "📡 LIVE GROWW SNAPSHOT | "
-                    f"NIFTY: {nifty_price} | "
-                    f"SENSEX: {sensex_price}"
+                prices = provider_snapshot.get(
+                    "prices",
+                    {},
                 )
+
+
+                # ==================================================
+                # LIVE MARKET
+                # ==================================================
+
+                if status == "LIVE":
+
+                    await self.handle_live_snapshot(
+                        prices=prices,
+                        now=now,
+                        provider_snapshot=provider_snapshot,
+                    )
+
+
+                # ==================================================
+                # MARKET CLOSED
+                # ==================================================
+
+                elif status == "MARKET_CLOSED":
+
+                    await self.handle_market_closed(
+                        prices=prices,
+                        now=now,
+                        provider_snapshot=provider_snapshot,
+                    )
+
+
+                # ==================================================
+                # UNKNOWN PROVIDER STATE
+                # ==================================================
+
+                else:
+
+                    raise RuntimeError(
+                        f"Unknown Groww provider status: {status}"
+                    )
 
 
             except asyncio.CancelledError:
@@ -198,37 +167,8 @@ class MarketService:
 
             except Exception as error:
 
-                self.error = (
-                    f"{type(error).__name__}: {error}"
-                )
-
-                print(
-                    "❌ LIVE FEED ERROR:",
-                    self.error,
-                )
-
-                # IMPORTANT:
-                # Destroy stale snapshot immediately.
-                # Never leave old DEMO/live prices visible.
-                self.latest = {
-                    "ts": time.time(),
-                    "mode": settings.app_mode,
-                    "status": "LIVE_FEED_ERROR",
-                    "live": False,
-                    "prices": {},
-                    "analysis": {},
-                    "forecast": {},
-                    "combined": None,
-                    "news_score": self.news.score(),
-                    "news": self.news.latest(),
-                    "alerts": list(self.alerts),
-                    "error": self.error,
-                    "experimental": True,
-                }
-
-                # Tell every connected dashboard immediately.
-                await self.broadcast(
-                    self.latest
+                await self.handle_feed_error(
+                    error
                 )
 
 
@@ -237,7 +177,308 @@ class MarketService:
             )
 
 
-    def build_snapshot(
+    async def handle_live_snapshot(
+        self,
+        prices,
+        now,
+        provider_snapshot,
+    ):
+
+        # --------------------------------------------------
+        # VALIDATE REAL LIVE PRICES
+        # --------------------------------------------------
+
+        if "NIFTY" not in prices:
+
+            raise RuntimeError(
+                "NIFTY missing from live Groww snapshot"
+            )
+
+
+        if "SENSEX" not in prices:
+
+            raise RuntimeError(
+                "SENSEX missing from live Groww snapshot"
+            )
+
+
+        nifty_price = float(
+            prices["NIFTY"]
+        )
+
+        sensex_price = float(
+            prices["SENSEX"]
+        )
+
+
+        if nifty_price <= 0:
+
+            raise RuntimeError(
+                "Invalid NIFTY live price"
+            )
+
+
+        if sensex_price <= 0:
+
+            raise RuntimeError(
+                "Invalid SENSEX live price"
+            )
+
+
+        prices = {
+            "NIFTY": nifty_price,
+            "SENSEX": sensex_price,
+        }
+
+
+        # --------------------------------------------------
+        # REAL LIVE DATA CONFIRMED
+        # --------------------------------------------------
+
+        self.error = None
+
+
+        # Only genuine live prices enter CandleEngine.
+        for symbol, price in prices.items():
+
+            self.engine.add_tick(
+                symbol,
+                price,
+                now,
+                60,
+            )
+
+
+        # Only genuine live prices resolve predictions.
+        self.db.resolve(
+            now,
+            prices,
+        )
+
+
+        self.latest = self.build_live_snapshot(
+            prices,
+            now,
+        )
+
+
+        if (
+            now - self.last_prediction
+            >= settings.prediction_interval_seconds
+        ):
+
+            self.store_predictions(
+                now
+            )
+
+            self.last_prediction = now
+
+
+        self.detect_alert(
+            now
+        )
+
+
+        await self.broadcast(
+            self.latest
+        )
+
+
+        print(
+            "📡 LIVE GROWW SNAPSHOT | "
+            f"NIFTY: {nifty_price} | "
+            f"SENSEX: {sensex_price}"
+        )
+
+
+    async def handle_market_closed(
+        self,
+        prices,
+        now,
+        provider_snapshot,
+    ):
+
+        # --------------------------------------------------
+        # MARKET CLOSED IS NOT AN ERROR
+        # --------------------------------------------------
+
+        self.error = None
+
+        saved_timestamp = (
+            provider_snapshot.get(
+                "timestamp"
+            )
+        )
+
+
+        # --------------------------------------------------
+        # SAVED LAST MARKET VALUES AVAILABLE
+        # --------------------------------------------------
+
+        if (
+            "NIFTY" in prices
+            and "SENSEX" in prices
+        ):
+
+            nifty_price = float(
+                prices["NIFTY"]
+            )
+
+            sensex_price = float(
+                prices["SENSEX"]
+            )
+
+
+            self.latest = {
+                "ts": now,
+                "mode": settings.app_mode,
+
+                "status": "MARKET_CLOSED",
+                "live": False,
+
+                "prices": {
+                    "NIFTY": nifty_price,
+                    "SENSEX": sensex_price,
+                },
+
+                # IMPORTANT:
+                # These are saved values.
+                # Do not generate new analysis or predictions.
+                "analysis": {},
+                "forecast": {},
+                "combined": None,
+
+                "news_score": self.news.score(),
+                "news": self.news.latest(),
+
+                "alerts": list(
+                    self.alerts
+                ),
+
+                "error": None,
+
+                "market_message": (
+                    "Market closed. Showing last saved "
+                    "genuine Groww market values."
+                ),
+
+                "last_live_timestamp": (
+                    saved_timestamp
+                ),
+
+                "experimental": True,
+            }
+
+
+            print(
+                "🌙 MARKET CLOSED | "
+                "Showing last saved values | "
+                f"NIFTY: {nifty_price} | "
+                f"SENSEX: {sensex_price}"
+            )
+
+
+        # --------------------------------------------------
+        # NO SAVED SNAPSHOT YET
+        # --------------------------------------------------
+
+        else:
+
+            self.latest = {
+                "ts": now,
+                "mode": settings.app_mode,
+
+                "status": "MARKET_CLOSED",
+                "live": False,
+
+                "prices": {},
+
+                "analysis": {},
+                "forecast": {},
+                "combined": None,
+
+                "news_score": self.news.score(),
+                "news": self.news.latest(),
+
+                "alerts": list(
+                    self.alerts
+                ),
+
+                "error": None,
+
+                "market_message": (
+                    "Market closed. No saved live snapshot "
+                    "is available on this machine yet."
+                ),
+
+                "last_live_timestamp": None,
+
+                "experimental": True,
+            }
+
+
+            print(
+                "🌙 MARKET CLOSED | "
+                "No saved live snapshot available"
+            )
+
+
+        await self.broadcast(
+            self.latest
+        )
+
+
+    async def handle_feed_error(
+        self,
+        error,
+    ):
+
+        self.error = (
+            f"{type(error).__name__}: {error}"
+        )
+
+
+        print(
+            "❌ LIVE FEED ERROR:",
+            self.error,
+        )
+
+
+        self.latest = {
+            "ts": time.time(),
+            "mode": settings.app_mode,
+
+            "status": "LIVE_FEED_ERROR",
+            "live": False,
+
+            "prices": {},
+
+            "analysis": {},
+            "forecast": {},
+            "combined": None,
+
+            "news_score": self.news.score(),
+            "news": self.news.latest(),
+
+            "alerts": list(
+                self.alerts
+            ),
+
+            "error": self.error,
+
+            "market_message": None,
+            "last_live_timestamp": None,
+
+            "experimental": True,
+        }
+
+
+        await self.broadcast(
+            self.latest
+        )
+
+
+    def build_live_snapshot(
         self,
         prices,
         now,
@@ -257,9 +498,11 @@ class MarketService:
             )
         }
 
+
         news_score = self.news.score()
 
         forecasts = {}
+
 
         for symbol in analyses:
 
@@ -272,6 +515,7 @@ class MarketService:
             peer = analyses[
                 peer_symbol
             ]
+
 
             forecasts[symbol] = [
                 predict(
@@ -287,22 +531,36 @@ class MarketService:
                 )
             ]
 
+
         return {
             "ts": now,
             "mode": settings.app_mode,
+
             "status": "LIVE",
             "live": True,
+
             "prices": prices,
+
             "analysis": analyses,
             "forecast": forecasts,
+
             "combined": combined_verdict(
                 analyses["NIFTY"],
                 analyses["SENSEX"],
             ),
+
             "news_score": news_score,
             "news": self.news.latest(),
-            "alerts": list(self.alerts),
+
+            "alerts": list(
+                self.alerts
+            ),
+
             "error": None,
+
+            "market_message": None,
+            "last_live_timestamp": now,
+
             "experimental": True,
         }
 
@@ -316,12 +574,14 @@ class MarketService:
 
             return
 
+
         if not self.latest.get(
             "live",
             False,
         ):
 
             return
+
 
         for symbol, predictions in (
             self.latest["forecast"].items()
@@ -349,6 +609,7 @@ class MarketService:
 
             return
 
+
         if not self.latest.get(
             "live",
             False,
@@ -356,18 +617,22 @@ class MarketService:
 
             return
 
+
         combined = self.latest.get(
             "combined"
         )
+
 
         if not combined:
 
             return
 
+
         key = (
             combined["verdict"],
             combined["confirmation"],
         )
+
 
         if (
             key != self.last_alert_key
@@ -378,10 +643,12 @@ class MarketService:
             self.alerts.appendleft(
                 {
                     "ts": now,
+
                     "title": (
                         f'{combined["verdict"]} '
                         "confirmation"
                     ),
+
                     "message": (
                         "NIFTY and SENSEX are "
                         f'{combined["confirmation"].lower()}. '
@@ -389,6 +656,7 @@ class MarketService:
                     ),
                 }
             )
+
 
         self.last_alert_key = key
 
@@ -399,6 +667,7 @@ class MarketService:
     ):
 
         dead_clients = []
+
 
         for websocket in self.clients:
 
@@ -414,6 +683,7 @@ class MarketService:
                     websocket
                 )
 
+
         for websocket in dead_clients:
 
             self.clients.discard(
@@ -422,4 +692,3 @@ class MarketService:
 
 
 service = MarketService()
-
