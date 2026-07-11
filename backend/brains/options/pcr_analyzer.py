@@ -1,13 +1,18 @@
 """
 pcr_analyzer.py
 
+Trading Market AI
+Options Brain V2
+
 Put Call Ratio Analyzer
 
-Responsible for:
-- Total PCR
-- ATM PCR
-- Market Bias
-- Confidence Score
+Responsible for
+
+• Total PCR
+• ATM PCR
+• Market Sentiment
+• PCR Momentum
+• Bias
 """
 
 from dataclasses import dataclass
@@ -16,12 +21,43 @@ from typing import Dict, List
 from .option_chain import OptionChain
 
 
-@dataclass
+# ============================================================
+# Configuration
+# ============================================================
+
+STRONG_BEARISH_PCR = 0.70
+
+BEARISH_PCR = 0.90
+
+NEUTRAL_LOW = 0.90
+
+NEUTRAL_HIGH = 1.10
+
+BULLISH_PCR = 1.30
+
+PCR_SCORE = 25
+
+ATM_CONFIRMATION_SCORE = 15
+
+MAX_CONFIDENCE = 95
+
+
+# ============================================================
+# Result
+# ============================================================
+
+@dataclass(slots=True)
 class PCRAnalysis:
+
+    bias: str
 
     signal: str
 
     confidence: int
+
+    bullish_score: int
+
+    bearish_score: int
 
     pcr: float
 
@@ -32,6 +68,10 @@ class PCRAnalysis:
     details: Dict
 
 
+# ============================================================
+# Analyzer
+# ============================================================
+
 class PCRAnalyzer:
 
     def analyze(
@@ -39,132 +79,302 @@ class PCRAnalyzer:
         chain: OptionChain
     ) -> PCRAnalysis:
 
-        # ---------------------------------------------
-        # Total OI
-        # ---------------------------------------------
+        bullish_score = 0
 
-        total_call_oi = sum(
-            chain.get_call_oi().values()
-        )
+        bearish_score = 0
 
-        total_put_oi = sum(
-            chain.get_put_oi().values()
-        )
-
-        if total_call_oi == 0:
-            pcr = 0.0
-        else:
-            pcr = total_put_oi / total_call_oi
-
-        # ---------------------------------------------
-        # ATM PCR
-        # ---------------------------------------------
-
-        atm = chain.get_atm_strike()
-
-        atm_option = chain.get_strike(atm)
-
-        if atm_option and atm_option.call_oi > 0:
-            atm_pcr = atm_option.put_oi / atm_option.call_oi
-        else:
-            atm_pcr = 0.0
-
-        # ---------------------------------------------
-        # Bias
-        # ---------------------------------------------
-
-        signal = "Neutral"
-        confidence = 50
         reasons = []
 
-        if pcr < 0.70:
+        details = {}
 
-            signal = "Strong Bearish"
-            confidence = 90
-            reasons.append(
-                "Very low PCR indicates heavy Call dominance."
-            )
+        # ===================================================
+        # Total PCR
+        # ===================================================
 
-        elif pcr < 0.90:
+        total_call_oi = chain.total_call_oi
 
-            signal = "Bearish"
-            confidence = 75
-            reasons.append(
-                "PCR below 0.90 suggests bearish sentiment."
-            )
+        total_put_oi = chain.total_put_oi
 
-        elif pcr <= 1.10:
+        if total_call_oi == 0:
 
-            signal = "Neutral"
-            confidence = 55
-            reasons.append(
-                "PCR near 1.0 indicates balanced positioning."
-            )
+            pcr = 0.0
 
-        elif pcr <= 1.30:
+        else:
 
-            signal = "Bullish"
-            confidence = 75
-            reasons.append(
-                "PCR above 1.10 suggests Put writers are stronger."
+            pcr = total_put_oi / total_call_oi
+
+        # ===================================================
+        # ATM PCR
+        # ===================================================
+
+        atm = chain.get_atm_option()
+
+        if (
+
+            atm
+
+            and
+
+            atm.call_oi > 0
+
+        ):
+
+            atm_pcr = (
+
+                atm.put_oi /
+
+                atm.call_oi
+
             )
 
         else:
 
-            signal = "Strong Bullish"
-            confidence = 90
+            atm_pcr = 0.0
+
+        # ===================================================
+        # PCR Classification
+        # ===================================================
+
+        if pcr < STRONG_BEARISH_PCR:
+
+            bearish_score += PCR_SCORE
+
             reasons.append(
-                "Very high PCR indicates strong Put dominance."
+
+                "Very Low PCR indicates strong bearish sentiment."
+
             )
 
-        # ---------------------------------------------
+        elif pcr < BEARISH_PCR:
+
+            bearish_score += PCR_SCORE - 5
+
+            reasons.append(
+
+                "Low PCR indicates bearish sentiment."
+
+            )
+
+        elif NEUTRAL_LOW <= pcr <= NEUTRAL_HIGH:
+
+            reasons.append(
+
+                "PCR indicates neutral positioning."
+
+            )
+
+        elif pcr <= BULLISH_PCR:
+
+            bullish_score += PCR_SCORE - 5
+
+            reasons.append(
+
+                "High PCR indicates bullish sentiment."
+
+            )
+
+        else:
+
+            bullish_score += PCR_SCORE
+
+            reasons.append(
+
+                "Very High PCR indicates strong bullish sentiment."
+
+            )
+
+        # ===================================================
         # ATM Confirmation
-        # ---------------------------------------------
+        # ===================================================
 
         if atm_pcr > 1.20:
 
-            confidence += 5
+            bullish_score += ATM_CONFIRMATION_SCORE
 
             reasons.append(
+
                 "ATM PCR confirms bullish positioning."
+
             )
 
         elif atm_pcr < 0.80:
 
-            confidence += 5
+            bearish_score += ATM_CONFIRMATION_SCORE
 
             reasons.append(
+
                 "ATM PCR confirms bearish positioning."
+
             )
 
-        confidence = max(0, min(100, confidence))
+        # ===================================================
+        # Store Details
+        # ===================================================
 
-        # ---------------------------------------------
+        details.update({
+
+            "atm_strike": chain.get_atm_strike(),
+
+            "total_call_oi": total_call_oi,
+
+            "total_put_oi": total_put_oi,
+
+        })
+
+        # ===================================================
+        # Bias
+        # ===================================================
+
+        score_difference = abs(
+
+            bullish_score -
+
+            bearish_score
+
+        )
+
+        if bullish_score > bearish_score:
+
+            bias = "BULLISH"
+
+            signal = "PCR Bullish"
+
+        elif bearish_score > bullish_score:
+
+            bias = "BEARISH"
+
+            signal = "PCR Bearish"
+
+        else:
+
+            bias = "NEUTRAL"
+
+            signal = "PCR Neutral"
+
+        # ===================================================
+        # Confidence
+        # ===================================================
+
+        total_score = bullish_score + bearish_score
+
+        if total_score == 0:
+
+            confidence = 50
+
+        else:
+
+            confidence = int(
+
+                (
+
+                    max(
+
+                        bullish_score,
+
+                        bearish_score
+
+                    )
+
+                    /
+
+                    total_score
+
+                )
+
+                * 100
+
+            )
+
+            confidence = min(
+
+                confidence,
+
+                MAX_CONFIDENCE
+
+            )
+
+        # ===================================================
+        # Additional Context
+        # ===================================================
+
+        if pcr > 1.50:
+
+            reasons.append(
+
+                "Extreme Put dominance detected."
+
+            )
+
+        elif pcr < 0.60:
+
+            reasons.append(
+
+                "Extreme Call dominance detected."
+
+            )
+
+        if abs(atm_pcr - pcr) > 0.25:
+
+            reasons.append(
+
+                "ATM PCR differs significantly from overall PCR."
+
+            )
+
+        # ===================================================
+        # Details
+        # ===================================================
+
+        details.update({
+
+            "bullish_score": bullish_score,
+
+            "bearish_score": bearish_score,
+
+            "score_difference": score_difference,
+
+            "total_score": total_score,
+
+            "overall_pcr": round(pcr, 2),
+
+            "atm_pcr": round(atm_pcr, 2),
+
+        })
+
+        # ===================================================
+        # Return
+        # ===================================================
 
         return PCRAnalysis(
+
+            bias=bias,
 
             signal=signal,
 
             confidence=confidence,
 
-            pcr=round(pcr, 2),
+            bullish_score=bullish_score,
 
-            atm_pcr=round(atm_pcr, 2),
+            bearish_score=bearish_score,
+
+            pcr=round(
+
+                pcr,
+
+                2
+
+            ),
+
+            atm_pcr=round(
+
+                atm_pcr,
+
+                2
+
+            ),
 
             reasons=reasons,
 
-            details={
-
-                "total_call_oi": total_call_oi,
-
-                "total_put_oi": total_put_oi,
-
-                "atm_strike": atm,
-
-                "atm_call_oi": atm_option.call_oi if atm_option else 0,
-
-                "atm_put_oi": atm_option.put_oi if atm_option else 0,
-
-            }
+            details=details
 
         )

@@ -1,18 +1,22 @@
 """
 oi_analyzer.py
 
+Trading Market AI
+Options Brain V2
+
 Open Interest Analyzer
 
 Responsible for
 
-• Support
-• Resistance
+• OI Support
+• OI Resistance
 • Call Writing
 • Put Writing
 • Long Build-up
 • Short Build-up
 • Long Unwinding
 • Short Covering
+• OI Wall Detection
 """
 
 from dataclasses import dataclass
@@ -21,12 +25,40 @@ from typing import Dict, List
 from .option_chain import OptionChain
 
 
-@dataclass
+# ============================================================
+# Configuration
+# ============================================================
+
+CALL_WRITING_SCORE = 20
+PUT_WRITING_SCORE = 20
+
+LONG_BUILDUP_SCORE = 15
+SHORT_BUILDUP_SCORE = 15
+
+LONG_UNWIND_SCORE = 12
+SHORT_COVER_SCORE = 12
+
+SUP_RES_SCORE = 10
+
+MAX_CONFIDENCE = 95
+
+
+# ============================================================
+# Result
+# ============================================================
+
+@dataclass(slots=True)
 class OIAnalysis:
+
+    bias: str
 
     signal: str
 
     confidence: int
+
+    bullish_score: int
+
+    bearish_score: int
 
     support: float
 
@@ -37,6 +69,10 @@ class OIAnalysis:
     details: Dict
 
 
+# ============================================================
+# Analyzer
+# ============================================================
+
 class OIAnalyzer:
 
     def analyze(
@@ -44,159 +80,373 @@ class OIAnalyzer:
         chain: OptionChain
     ) -> OIAnalysis:
 
-        call_oi = chain.get_call_oi()
-        put_oi = chain.get_put_oi()
+        atm = chain.get_atm_strike()
 
-        call_change = chain.get_call_change_oi()
-        put_change = chain.get_put_change_oi()
-
-        # ---------------------------------------------
-
-        resistance = max(
-            call_oi,
-            key=call_oi.get
-        )
-
-        support = max(
-            put_oi,
-            key=put_oi.get
-        )
+        bullish_score = 0
+        bearish_score = 0
 
         reasons = []
 
-        confidence = 50
+        details = {}
 
-        signal = "Neutral"
+        support = None
+        resistance = None
 
-        # ---------------------------------------------
-        # Put Writing
-        # ---------------------------------------------
+        # ===================================================
+        # Support Detection
+        # Highest Put OI BELOW spot
+        # ===================================================
 
-        max_put_change = max(
-            put_change.values()
-        )
+        support_candidates = [
 
-        put_strike = max(
-            put_change,
-            key=put_change.get
-        )
+            option
 
-        if max_put_change > 0:
+            for option in chain.get_strikes_below(chain.spot_price)
 
-            reasons.append(
-                f"Strong Put Writing at {put_strike}"
+        ]
+
+        if support_candidates:
+
+            strongest_support = max(
+
+                support_candidates,
+
+                key=lambda x: x.put_oi
+
             )
 
-            confidence += 15
+            support = strongest_support.strike
+
+            bullish_score += SUP_RES_SCORE
+
+            reasons.append(
+
+                f"Strong Put OI support at {support}"
+
+            )
+
+        else:
+
+            support = atm
+
+        # ===================================================
+        # Resistance Detection
+        # Highest Call OI ABOVE spot
+        # ===================================================
+
+        resistance_candidates = [
+
+            option
+
+            for option in chain.get_strikes_above(chain.spot_price)
+
+        ]
+
+        if resistance_candidates:
+
+            strongest_resistance = max(
+
+                resistance_candidates,
+
+                key=lambda x: x.call_oi
+
+            )
+
+            resistance = strongest_resistance.strike
+
+            bearish_score += SUP_RES_SCORE
+
+            reasons.append(
+
+                f"Strong Call OI resistance at {resistance}"
+
+            )
+
+        else:
+
+            resistance = atm
+
+        # ===================================================
+        # Put Writing
+        # ===================================================
+
+        strongest_put_writer = max(
+
+            chain,
+
+            key=lambda x: x.put_change_oi
+
+        )
+
+        if strongest_put_writer.put_change_oi > 0:
+
+            bullish_score += CALL_WRITING_SCORE
+
+            reasons.append(
+
+                f"Put Writing at {strongest_put_writer.strike}"
+
+            )
+
+        # ===================================================
+        # Call Writing
+        # ===================================================
+
+        strongest_call_writer = max(
+
+            chain,
+
+            key=lambda x: x.call_change_oi
+
+        )
+
+        if strongest_call_writer.call_change_oi > 0:
+
+            bearish_score += CALL_WRITING_SCORE
+
+            reasons.append(
+
+                f"Call Writing at {strongest_call_writer.strike}"
+
+            )
+
+        # ===================================================
+        # Store Details
+        # ===================================================
+
+        details["atm"] = atm
+
+        details["support"] = support
+
+        details["resistance"] = resistance
+
+        details["highest_call_writer"] = strongest_call_writer.strike
+
+        details["highest_put_writer"] = strongest_put_writer.strike
+
+        # ===================================================
+        # Market Structure Detection
+        # ===================================================
+
+        long_buildup = 0
+        short_buildup = 0
+        long_unwinding = 0
+        short_covering = 0
+
+        call_wall_strength = 0
+        put_wall_strength = 0
+
+        # ---------------------------------------------------
+
+        for option in chain:
+
+            # -----------------------------------------------
+            # Long Build-up
+            # Price ↑ + OI ↑
+            # -----------------------------------------------
+
+            if (
+                option.call_change_oi > 0
+                and option.call_ltp > 0
+            ):
+
+                long_buildup += 1
+
+            # -----------------------------------------------
+            # Short Build-up
+            # Put OI increasing
+            # -----------------------------------------------
+
+            if (
+                option.put_change_oi > 0
+                and option.put_ltp > 0
+            ):
+
+                short_buildup += 1
+
+            # -----------------------------------------------
+            # Long Unwinding
+            # -----------------------------------------------
+
+            if option.call_change_oi < 0:
+
+                long_unwinding += 1
+
+            # -----------------------------------------------
+            # Short Covering
+            # -----------------------------------------------
+
+            if option.put_change_oi < 0:
+
+                short_covering += 1
+
+            # -----------------------------------------------
+            # OI Wall Strength
+            # -----------------------------------------------
+
+            if option.call_oi >= 500000:
+
+                call_wall_strength += 1
+
+            if option.put_oi >= 500000:
+
+                put_wall_strength += 1
+
+        # ---------------------------------------------------
+        # Score Engine
+        # ---------------------------------------------------
+
+        if long_buildup >= 3:
+
+            bullish_score += LONG_BUILDUP_SCORE
+
+            reasons.append(
+                f"Long Build-up detected ({long_buildup} strikes)"
+            )
+
+        if short_covering >= 3:
+
+            bullish_score += SHORT_COVER_SCORE
+
+            reasons.append(
+                f"Short Covering detected ({short_covering} strikes)"
+            )
+
+        if short_buildup >= 3:
+
+            bearish_score += SHORT_BUILDUP_SCORE
+
+            reasons.append(
+                f"Short Build-up detected ({short_buildup} strikes)"
+            )
+
+        if long_unwinding >= 3:
+
+            bearish_score += LONG_UNWIND_SCORE
+
+            reasons.append(
+                f"Long Unwinding detected ({long_unwinding} strikes)"
+            )
+
+        # ---------------------------------------------------
+        # OI Wall Strength
+        # ---------------------------------------------------
+
+        if put_wall_strength:
+
+            bullish_score += put_wall_strength * 2
+
+            reasons.append(
+                f"{put_wall_strength} strong Put OI wall(s)"
+            )
+
+        if call_wall_strength:
+
+            bearish_score += call_wall_strength * 2
+
+            reasons.append(
+                f"{call_wall_strength} strong Call OI wall(s)"
+            )
+
+        # ---------------------------------------------------
+        # Details
+        # ---------------------------------------------------
+
+        details.update({
+
+            "long_buildup": long_buildup,
+
+            "short_buildup": short_buildup,
+
+            "long_unwinding": long_unwinding,
+
+            "short_covering": short_covering,
+
+            "call_wall_strength": call_wall_strength,
+
+            "put_wall_strength": put_wall_strength,
+
+        })
+
+        # ===================================================
+        # Final Bias
+        # ===================================================
+
+        score_difference = abs(
+            bullish_score - bearish_score
+        )
+
+        if bullish_score > bearish_score:
+
+            bias = "BULLISH"
 
             signal = "Bullish"
 
-        # ---------------------------------------------
-        # Call Writing
-        # ---------------------------------------------
+        elif bearish_score > bullish_score:
 
-        max_call_change = max(
-            call_change.values()
-        )
+            bias = "BEARISH"
 
-        call_strike = max(
-            call_change,
-            key=call_change.get
-        )
+            signal = "Bearish"
 
-        if max_call_change > 0:
+        else:
 
-            reasons.append(
-                f"Strong Call Writing at {call_strike}"
-            )
+            bias = "NEUTRAL"
 
-            confidence += 15
+            signal = "Neutral"
 
-            if signal == "Bullish":
-                signal = "Neutral"
-            else:
-                signal = "Bearish"
-
-        # ---------------------------------------------
-        # Long Build-up
-        # ---------------------------------------------
-
-        long_build = 0
-
-        for strike in chain.options:
-
-            if (
-                strike.call_change_oi > 0
-                and strike.call_ltp > 0
-            ):
-                long_build += 1
-
-        if long_build >= 3:
-
-            reasons.append(
-                "Call Long Build-up Detected"
-            )
-
-            confidence += 8
-
-        # ---------------------------------------------
-        # Short Covering
-        # ---------------------------------------------
-
-        short_cover = 0
-
-        for strike in chain.options:
-
-            if (
-                strike.call_change_oi < 0
-                and strike.call_ltp > 0
-            ):
-                short_cover += 1
-
-        if short_cover >= 3:
-
-            reasons.append(
-                "Short Covering Detected"
-            )
-
-            confidence += 8
-
-        # ---------------------------------------------
-        # Long Unwinding
-        # ---------------------------------------------
-
-        long_unwind = 0
-
-        for strike in chain.options:
-
-            if (
-                strike.put_change_oi < 0
-                and strike.put_ltp > 0
-            ):
-                long_unwind += 1
-
-        if long_unwind >= 3:
-
-            reasons.append(
-                "Long Unwinding Detected"
-            )
-
-            confidence += 8
-
-        # ---------------------------------------------
+        # ===================================================
         # Confidence
-        # ---------------------------------------------
+        # ===================================================
 
-        confidence = max(
-            0,
-            min(100, confidence)
-        )
+        total_score = bullish_score + bearish_score
+
+        if total_score == 0:
+
+            confidence = 0
+
+        else:
+
+            confidence = int(
+
+                min(
+
+                    MAX_CONFIDENCE,
+
+                    50 + score_difference
+
+                )
+
+            )
+
+        # ---------------------------------------------------
+
+        details.update({
+
+            "bullish_score": bullish_score,
+
+            "bearish_score": bearish_score,
+
+            "score_difference": score_difference,
+
+            "total_score": total_score,
+
+        })
+
+        # ===================================================
+        # Return
+        # ===================================================
 
         return OIAnalysis(
+
+            bias=bias,
 
             signal=signal,
 
             confidence=confidence,
+
+            bullish_score=bullish_score,
+
+            bearish_score=bearish_score,
 
             support=support,
 
@@ -204,22 +454,6 @@ class OIAnalyzer:
 
             reasons=reasons,
 
-            details={
-
-                "highest_call_oi": resistance,
-
-                "highest_put_oi": support,
-
-                "highest_call_change": call_strike,
-
-                "highest_put_change": put_strike,
-
-                "long_build_count": long_build,
-
-                "short_cover_count": short_cover,
-
-                "long_unwind_count": long_unwind,
-
-            }
+            details=details
 
         )

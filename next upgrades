@@ -1,7 +1,10 @@
-✅ option_chain.py
-✅ oi_analyzer.py
-⬜ pcr_analyzer.py
-⬜ iv_analyzer.py
-⬜ strike_analyzer.py
-⬜ premium_flow.py
-⬜ options_brain.py
+Volatility Scenarios
+OI Scenarios
+Premium Flow Scenarios
+Mixed Scenario
+Edge Cases
+High IV & Low IV (tests IVAnalyzer)
+Heavy Call Writing & Heavy Put Writing (tests OIAnalyzer)
+Premium Bullish & Premium Bearish (tests PremiumFlowAnalyzer)
+Conflicting (tests OptionsBrain)
+Edge cases (empty_chain, zero_oi_chain, etc.)

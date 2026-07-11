@@ -1,13 +1,18 @@
 """
 premium_flow.py
 
+Trading Market AI
+Options Brain V2
+
 Premium Flow Analyzer
 
-Responsible for:
-- Premium Momentum
-- Volume Momentum
-- Smart Money Detection
-- Bullish/Bearish Premium Flow
+Responsible for
+
+• Premium Flow
+• Volume Flow
+• Buyer / Seller Pressure
+• Smart Money Detection
+• Flow Strength
 """
 
 from dataclasses import dataclass
@@ -16,19 +21,58 @@ from typing import Dict, List
 from .option_chain import OptionChain
 
 
-@dataclass
+# ============================================================
+# Configuration
+# ============================================================
+
+PREMIUM_SCORE = 25
+
+VOLUME_SCORE = 20
+
+SMART_MONEY_SCORE = 15
+
+FLOW_DOMINANCE_SCORE = 10
+
+MAX_CONFIDENCE = 95
+
+
+# ============================================================
+# Result
+# ============================================================
+
+@dataclass(slots=True)
 class PremiumFlowAnalysis:
+
+    bias: str
 
     signal: str
 
     confidence: int
 
-    dominant_side: str
+    bullish_score: int
+
+    bearish_score: int
+
+    call_premium: float
+
+    put_premium: float
+
+    call_volume: int
+
+    put_volume: int
+
+    premium_ratio: float
+
+    volume_ratio: float
 
     reasons: List[str]
 
     details: Dict
 
+
+# ============================================================
+# Analyzer
+# ============================================================
 
 class PremiumFlowAnalyzer:
 
@@ -37,143 +81,422 @@ class PremiumFlowAnalyzer:
         chain: OptionChain
     ) -> PremiumFlowAnalysis:
 
-        total_call_premium = 0.0
-        total_put_premium = 0.0
+        bullish_score = 0
 
-        total_call_volume = 0
-        total_put_volume = 0
+        bearish_score = 0
 
         reasons = []
 
-        confidence = 50
+        details = {}
 
-        # ---------------------------------------
+        call_premium = chain.total_call_premium
 
-        for option in chain.options:
+        put_premium = chain.total_put_premium
 
-            total_call_premium += (
-                option.call_ltp * option.call_volume
-            )
+        call_volume = chain.total_call_volume
 
-            total_put_premium += (
-                option.put_ltp * option.put_volume
-            )
+        put_volume = chain.total_put_volume
 
-            total_call_volume += option.call_volume
-            total_put_volume += option.put_volume
+        # ===================================================
+        # Premium Ratio
+        # ===================================================
 
-        # ---------------------------------------
+        total_premium = call_premium + put_premium
 
-        if total_call_premium > total_put_premium:
+        if total_premium > 0:
 
-            signal = "Bullish"
+            premium_ratio = call_premium / total_premium
 
-            dominant = "CALL"
+        else:
 
-            confidence += 20
+            premium_ratio = 0.50
+
+        # ===================================================
+        # Volume Ratio
+        # ===================================================
+
+        total_volume = call_volume + put_volume
+
+        if total_volume > 0:
+
+            volume_ratio = call_volume / total_volume
+
+        else:
+
+            volume_ratio = 0.50
+
+        # ===================================================
+        # Premium Dominance
+        # ===================================================
+
+        if premium_ratio >= 0.65:
+
+            bullish_score += PREMIUM_SCORE
 
             reasons.append(
-                "Call premium flow dominates."
+                "Call premium dominates."
             )
 
-        elif total_put_premium > total_call_premium:
 
-            signal = "Bearish"
+        elif premium_ratio <= 0.35:
 
-            dominant = "PUT"
-
-            confidence += 20
+            bearish_score += PREMIUM_SCORE
 
             reasons.append(
-                "Put premium flow dominates."
+                "Put premium dominates."
             )
 
         else:
 
-            signal = "Neutral"
-
-            dominant = "NONE"
-
-        # ---------------------------------------
-        # Volume Confirmation
-        # ---------------------------------------
-
-        if total_call_volume > total_put_volume:
-
             reasons.append(
-                "Call volume higher than Put volume."
+                "Premium flow is balanced."
             )
 
-            if dominant == "CALL":
-                confidence += 10
+        # ===================================================
+        # Volume Dominance
+        # ===================================================
 
-        elif total_put_volume > total_call_volume:
+        if volume_ratio >= 0.60:
+
+            bullish_score += VOLUME_SCORE
 
             reasons.append(
-                "Put volume higher than Call volume."
+                "Call volume dominates."
             )
 
-            if dominant == "PUT":
-                confidence += 10
+        elif volume_ratio <= 0.40:
 
-        # ---------------------------------------
-        # Smart Money Heuristic
-        # ---------------------------------------
+            bearish_score += VOLUME_SCORE
 
-        smart_money = "Unknown"
+            reasons.append(
+                "Put volume dominates."
+            )
+
+        else:
+
+            reasons.append(
+                "Volume flow is balanced."
+            )
+
+        # ===================================================
+        # Buyer / Seller Pressure
+        # ===================================================
+
+        flow_gap = abs(
+
+            premium_ratio -
+
+            volume_ratio
+
+        )
+
+        if flow_gap >= 0.10:
+
+            if premium_ratio > volume_ratio:
+
+                bullish_score += FLOW_DOMINANCE_SCORE
+
+                reasons.append(
+
+                    "Premium flow stronger than volume flow."
+
+                )
+
+            else:
+
+                bearish_score += FLOW_DOMINANCE_SCORE
+
+                reasons.append(
+
+                    "Volume flow stronger than premium flow."
+
+                )
+
+        else:
+
+            reasons.append(
+
+                "Premium and volume flow are aligned."
+
+            )
+
+        # ===================================================
+        # Smart Money Detection
+        # ===================================================
 
         if (
-            total_call_premium > total_put_premium
-            and total_call_volume > total_put_volume
+
+            premium_ratio > 0.70
+
+            and
+
+            volume_ratio > 0.60
+
         ):
 
-            smart_money = "CALL BUYERS"
-
-            confidence += 10
+            bullish_score += SMART_MONEY_SCORE
 
             reasons.append(
-                "Premium and volume confirm Call buying."
+                "Possible institutional Call buying."
             )
 
         elif (
-            total_put_premium > total_call_premium
-            and total_put_volume > total_call_volume
+
+            premium_ratio < 0.40
+
+            and
+
+            volume_ratio < 0.40
+
         ):
+
+            bearish_score += SMART_MONEY_SCORE
+
+            reasons.append(
+                "Possible institutional Put buying."
+            )
+
+        # ===================================================
+        # Store Details
+        # ===================================================
+
+        details.update({
+
+            "call_premium": round(
+                call_premium,
+                2
+            ),
+
+            "put_premium": round(
+                put_premium,
+                2
+            ),
+
+            "call_volume": call_volume,
+
+            "put_volume": put_volume,
+
+            "premium_ratio": round(
+                premium_ratio,
+                3
+            ),
+
+            "volume_ratio": round(
+                volume_ratio,
+                3
+            )
+
+        })
+
+        # ===================================================
+        # Flow Strength
+        # ===================================================
+
+        flow_difference = abs(
+            premium_ratio - volume_ratio
+        )
+
+        if flow_difference >= 0.25:
+
+            flow_strength = "VERY_STRONG"
+
+        elif flow_difference >= 0.15:
+
+            flow_strength = "STRONG"
+
+        elif flow_difference >= 0.08:
+
+            flow_strength = "MODERATE"
+
+        else:
+
+            flow_strength = "WEAK"
+
+        reasons.append(
+            f"Flow Strength : {flow_strength}"
+        )
+
+        # ===================================================
+        # Smart Money
+        # ===================================================
+
+        if bullish_score > bearish_score:
+
+            smart_money = "CALL BUYERS"
+
+        elif bearish_score > bullish_score:
 
             smart_money = "PUT BUYERS"
 
-            confidence += 10
+        else:
 
-            reasons.append(
-                "Premium and volume confirm Put buying."
+            smart_money = "NEUTRAL"
+
+        reasons.append(
+            f"Smart Money : {smart_money}"
+        )
+
+        # ===================================================
+        # Premium Pressure
+        # ===================================================
+
+        premium_difference = abs(
+            call_premium -
+            put_premium
+        )
+
+        volume_difference = abs(
+            call_volume -
+            put_volume
+        )
+
+        details.update({
+
+            "flow_strength": flow_strength,
+
+            "smart_money": smart_money,
+
+            "premium_difference": round(
+                premium_difference,
+                2
+            ),
+
+            "volume_difference": volume_difference
+
+        })
+
+        # ===================================================
+        # Bias
+        # ===================================================
+
+        score_difference = abs(
+
+            bullish_score -
+
+            bearish_score
+
+        )
+
+        if bullish_score > bearish_score:
+
+            bias = "BULLISH"
+
+            signal = "Premium Flow Bullish"
+
+        elif bearish_score > bullish_score:
+
+            bias = "BEARISH"
+
+            signal = "Premium Flow Bearish"
+
+        else:
+
+            bias = "NEUTRAL"
+
+            signal = "Premium Flow Neutral"
+
+        # ===================================================
+        # Confidence
+        # ===================================================
+
+        total_score = bullish_score + bearish_score
+
+        if total_score == 0:
+
+            confidence = 50
+
+        else:
+
+            confidence = int(
+
+                (
+
+                    max(
+
+                        bullish_score,
+
+                        bearish_score
+
+                    )
+
+                    /
+
+                    total_score
+
+                )
+
+                * 100
+
             )
 
-        confidence = min(confidence, 100)
+            confidence = min(
 
-        # ---------------------------------------
+                confidence,
+
+                MAX_CONFIDENCE
+
+            )
+
+        # ===================================================
+        # Final Details
+        # ===================================================
+
+        details.update({
+
+            "bullish_score": bullish_score,
+
+            "bearish_score": bearish_score,
+
+            "score_difference": score_difference,
+
+            "total_score": total_score,
+
+            "confidence": confidence
+
+        })
+
+        # ===================================================
+        # Return
+        # ===================================================
 
         return PremiumFlowAnalysis(
+
+            bias=bias,
 
             signal=signal,
 
             confidence=confidence,
 
-            dominant_side=dominant,
+            bullish_score=bullish_score,
+
+            bearish_score=bearish_score,
+
+            call_premium=round(
+                call_premium,
+                2
+            ),
+
+            put_premium=round(
+                put_premium,
+                2
+            ),
+
+            call_volume=call_volume,
+
+            put_volume=put_volume,
+
+            premium_ratio=round(
+                premium_ratio,
+                3
+            ),
+
+            volume_ratio=round(
+                volume_ratio,
+                3
+            ),
 
             reasons=reasons,
 
-            details={
-
-                "call_premium": round(total_call_premium, 2),
-
-                "put_premium": round(total_put_premium, 2),
-
-                "call_volume": total_call_volume,
-
-                "put_volume": total_put_volume,
-
-                "smart_money": smart_money
-
-            }
+            details=details
 
         )

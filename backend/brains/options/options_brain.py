@@ -1,36 +1,97 @@
 """
 options_brain.py
 
-Master Options Brain
+Trading Market AI
+Options Brain V2
 
-Combines all option analyzers into
-one AI decision.
+Master Brain
+
+Responsibilities
+
+• Run all analyzers
+• Collect results
+• Weighted Voting
+• Agreement Engine
+• Final Decision
 """
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from typing import Dict, List
 
 from .option_chain import OptionChain
 
-from .oi_analyzer import OIAnalyzer
-from .pcr_analyzer import PCRAnalyzer
-from .iv_analyzer import IVAnalyzer
-from .strike_analyzer import StrikeAnalyzer
-from .premium_flow import PremiumFlowAnalyzer
+from .oi_analyzer import (
+    OIAnalyzer,
+    OIAnalysis
+)
+
+from .pcr_analyzer import (
+    PCRAnalyzer,
+    PCRAnalysis
+)
+
+from .iv_analyzer import (
+    IVAnalyzer,
+    IVAnalysis
+)
+
+from .strike_analyzer import (
+    StrikeAnalyzer,
+    StrikeAnalysis
+)
+
+from .premium_flow import (
+    PremiumFlowAnalyzer,
+    PremiumFlowAnalysis
+)
+
+# ============================================================
+# Analyzer Weights
+# ============================================================
+
+OI_WEIGHT = 0.30
+
+PREMIUM_WEIGHT = 0.25
+
+STRIKE_WEIGHT = 0.20
+
+PCR_WEIGHT = 0.15
+
+IV_WEIGHT = 0.10
+
+MAX_CONFIDENCE = 95
+
+# ============================================================
+# Decision Thresholds
+# ============================================================
+
+BUY_THRESHOLD = 0.55
+
+WAIT_THRESHOLD = 0.35
+
+VERY_STRONG = 0.85
+
+STRONG = 0.70
+
+MODERATE = 0.55
 
 
-# ------------------------------------------------------------
+# ============================================================
+# Result
+# ============================================================
 
-@dataclass
+@dataclass(slots=True)
 class OptionsBrainResult:
 
     direction: str
 
     confidence: int
 
-    setup: str
-
     strength: str
+
+    agreement: int
+
+    disagreement: int
 
     support: float
 
@@ -44,31 +105,34 @@ class OptionsBrainResult:
 
     contradictions: List[str]
 
-    metadata: Dict
+    analyzer_results: Dict
 
 
-# ------------------------------------------------------------
+# ============================================================
+# Options Brain
+# ============================================================
 
 class OptionsBrain:
 
     def __init__(self):
 
         self.oi = OIAnalyzer()
-
         self.pcr = PCRAnalyzer()
-
         self.iv = IVAnalyzer()
-
         self.strike = StrikeAnalyzer()
-
         self.premium = PremiumFlowAnalyzer()
 
-    # --------------------------------------------------------
+    # <-- dedent here
 
     def analyze(
         self,
         chain: OptionChain
     ) -> OptionsBrainResult:
+
+
+        # ----------------------------------------------------
+        # Execute all analyzers
+        # ----------------------------------------------------
 
         oi = self.oi.analyze(chain)
 
@@ -81,136 +145,220 @@ class OptionsBrain:
         premium = self.premium.analyze(chain)
 
         # ----------------------------------------------------
-        # Voting
+        # Store Results
         # ----------------------------------------------------
 
-        bullish = 0
+        analyzer_results = {
 
-        bearish = 0
+            "oi": oi,
+
+            "pcr": pcr,
+
+            "iv": iv,
+
+            "strike": strike,
+
+            "premium": premium
+
+        }
+
+        # ----------------------------------------------------
+        # Agreement Counters
+        # ----------------------------------------------------
+
+        bullish_votes = 0
+
+        bearish_votes = 0
+
+        neutral_votes = 0
 
         reasons = []
 
         contradictions = []
 
-        analyzers = [
-
-            ("OI", oi.signal),
-
-            ("PCR", pcr.signal),
-
-            ("IV", iv.signal),
-
-            ("Strike", strike.signal),
-
-            ("Premium", premium.signal),
-
-        ]
-
-        for name, signal in analyzers:
-
-            s = signal.lower()
-
-            if "bull" in s:
-
-                bullish += 1
-
-            elif "bear" in s:
-
-                bearish += 1
-
+        # ----------------------------------------------------
+        # Count Votes
         # ----------------------------------------------------
 
-        confidence = int(
+        for result in analyzer_results.values():
 
-            (
-                oi.confidence
-                + pcr.confidence
-                + iv.confidence
-                + strike.confidence
-                + premium.confidence
-            ) / 5
+            reasons.extend(result.reasons)
+
+            if result.bias == "BULLISH":
+
+                bullish_votes += 1
+
+            elif result.bias == "BEARISH":
+
+                bearish_votes += 1
+
+            else:
+
+                neutral_votes += 1
+
+        agreement = max(
+            bullish_votes,
+            bearish_votes,
+            neutral_votes
+        )
+
+        disagreement = min(
+
+            bullish_votes,
+
+            bearish_votes
 
         )
 
-        # ----------------------------------------------------
+        # ===================================================
+        # Weighted Voting Engine
+        # ===================================================
 
-        reasons.extend(oi.reasons)
+        bullish_weight = 0.0
+        bearish_weight = 0.0
+        neutral_weight = 0.0
 
-        reasons.extend(pcr.reasons)
+        analyzer_weights = {
 
-        reasons.extend(iv.reasons)
+            "oi": OI_WEIGHT,
 
-        reasons.extend(strike.reasons)
+            "premium": PREMIUM_WEIGHT,
 
-        reasons.extend(premium.reasons)
+            "strike": STRIKE_WEIGHT,
 
-        # ----------------------------------------------------
-        # Final Direction
-        # ----------------------------------------------------
+            "pcr": PCR_WEIGHT,
 
-        if bullish >= 4:
+            "iv": IV_WEIGHT
+
+        }
+
+        # ---------------------------------------------------
+
+        for name, result in analyzer_results.items():
+
+            base_weight = analyzer_weights[name]
+
+            weighted_vote = (
+
+                                    result.confidence / 100
+
+                            ) * base_weight
+
+            if result.bias == "BULLISH":
+
+                bullish_weight += weighted_vote
+
+            elif result.bias == "BEARISH":
+
+                bearish_weight += weighted_vote
+
+            else:
+
+                neutral_weight += weighted_vote
+
+        # ---------------------------------------------------
+        # Final Weighted Score
+        # ---------------------------------------------------
+
+        # weighted_difference = abs(
+        #
+        #     bullish_weight -
+        #
+        #     bearish_weight
+        #
+        # )
+
+        # ---------------------------------------------------
+        # Final Score Engine
+        # ---------------------------------------------------
+
+        weighted_score = max(
+            bullish_weight,
+            bearish_weight,
+            neutral_weight
+        )
+
+        vote_score = max(
+            bullish_votes,
+            bearish_votes,
+            neutral_votes
+        ) / len(analyzer_results)
+
+        # 60% agreement + 40% weighted confidence
+        final_score = (
+                vote_score * 0.60 +
+                weighted_score * 0.40
+        )
+
+        agreement_ratio = round(final_score, 2)
+
+
+        details = {
+
+            "bullish_weight": round(bullish_weight, 2),
+
+            "bearish_weight": round(bearish_weight, 2),
+
+            "neutral_weight": round(neutral_weight, 2),
+
+            "agreement_ratio": agreement_ratio,
+            "vote_score": round(vote_score, 2),
+            "weighted_score": round(weighted_score, 2),
+            "final_score": round(final_score, 2),
+
+            "bullish_votes": bullish_votes,
+
+            "bearish_votes": bearish_votes,
+
+            "neutral_votes": neutral_votes
+
+        }
+
+        # ===================================================
+        # Final Decision
+        # ===================================================
+
+        # ===================================================
+        # Final Decision
+        # ===================================================
+
+        # ===================================================
+        # Final Decision Engine
+        # ===================================================
+
+        if bullish_votes >= 3:
 
             direction = "BUY CALL"
 
-            setup = "Multi-Brain Bullish Confirmation"
-
-        elif bearish >= 4:
+        elif bearish_votes >= 3:
 
             direction = "BUY PUT"
 
-            setup = "Multi-Brain Bearish Confirmation"
-
-        elif bullish > bearish:
-
-            direction = "BUY CALL"
-
-            setup = "Bullish Bias"
-
-            contradictions.append(
-                "Not all analyzers agree."
-            )
-
-            confidence -= 8
-
-        elif bearish > bullish:
-
-            direction = "BUY PUT"
-
-            setup = "Bearish Bias"
-
-            contradictions.append(
-                "Not all analyzers agree."
-            )
-
-            confidence -= 8
-
-        else:
+        elif neutral_votes >= 3:
 
             direction = "WAIT"
 
-            setup = "Conflicting Signals"
+        elif abs(bullish_weight - bearish_weight) <= 0.08:
 
-            confidence -= 15
+            direction = "WAIT"
 
-            contradictions.append(
-                "Bullish and bearish votes are balanced."
-            )
+        else:
 
-        confidence = max(0, min(100, confidence))
+            direction = "AVOID"
 
-        # ----------------------------------------------------
+        # ===================================================
         # Strength
-        # ----------------------------------------------------
+        # ===================================================
 
-        if confidence >= 85:
+        if weighted_score >= VERY_STRONG:
 
             strength = "VERY STRONG"
 
-        elif confidence >= 70:
+        elif weighted_score >= STRONG:
 
             strength = "STRONG"
 
-        elif confidence >= 55:
+        elif weighted_score >= MODERATE:
 
             strength = "MODERATE"
 
@@ -218,13 +366,30 @@ class OptionsBrain:
 
             strength = "WEAK"
 
-        # ----------------------------------------------------
-        # Target / Stop Loss
-        # ----------------------------------------------------
+        # ===================================================
+        # Confidence
+        # ===================================================
+
+        confidence = int(
+            final_score * 100
+        )
+
+        confidence = min(
+            confidence,
+            MAX_CONFIDENCE
+        )
+
+        # ===================================================
+        # Support / Resistance
+        # ===================================================
 
         support = strike.support
 
         resistance = strike.resistance
+
+        # ===================================================
+        # Temporary Target / Stop Loss
+        # ===================================================
 
         if direction == "BUY CALL":
 
@@ -244,21 +409,91 @@ class OptionsBrain:
 
             stop_loss = chain.spot_price
 
-        # ----------------------------------------------------
+            # ===================================================
+            # Smart Reason Collector
+            # ===================================================
 
-        metadata = {
+        unique_reasons = []
+        seen = set()
 
-            "oi": asdict(oi),
+        for result in analyzer_results.values():
 
-            "pcr": asdict(pcr),
+            for reason in result.reasons:
 
-            "iv": asdict(iv),
+                if reason not in seen:
+                    unique_reasons.append(reason)
 
-            "strike": asdict(strike),
+                    seen.add(reason)
 
-            "premium": asdict(premium)
+        # ===================================================
+        # Contradiction Engine
+        # ===================================================
+
+        contradictions = []
+
+        bullish_modules = []
+        bearish_modules = []
+        neutral_modules = []
+
+        for name, result in analyzer_results.items():
+
+            if result.bias == "BULLISH":
+
+                bullish_modules.append(name.upper())
+
+            elif result.bias == "BEARISH":
+
+                bearish_modules.append(name.upper())
+
+            else:
+
+                neutral_modules.append(name.upper())
+
+        if bullish_modules and bearish_modules:
+            contradictions.append(
+
+                f"Bullish: {', '.join(bullish_modules)}"
+
+            )
+
+            contradictions.append(
+
+                f"Bearish: {', '.join(bearish_modules)}"
+
+            )
+
+        if neutral_modules:
+            contradictions.append(
+
+                f"Neutral: {', '.join(neutral_modules)}"
+
+            )
+
+        # ===================================================
+        # Analyzer Summary
+        # ===================================================
+
+        analyzer_summary = {
+
+            name: {
+
+                "bias": result.bias,
+
+                "signal": result.signal,
+
+                "confidence": result.confidence
+
+            }
+
+            for name, result in analyzer_results.items()
 
         }
+
+        details["analyzer_summary"] = analyzer_summary
+
+        # ===================================================
+        # Final Return
+        # ===================================================
 
         return OptionsBrainResult(
 
@@ -266,9 +501,11 @@ class OptionsBrain:
 
             confidence=confidence,
 
-            setup=setup,
-
             strength=strength,
+
+            agreement=agreement,
+
+            disagreement=disagreement,
 
             support=support,
 
@@ -278,10 +515,10 @@ class OptionsBrain:
 
             stop_loss=stop_loss,
 
-            reasons=reasons,
+            reasons=unique_reasons,
 
             contradictions=contradictions,
 
-            metadata=metadata
+            analyzer_results=analyzer_results
 
         )
