@@ -95,9 +95,12 @@ function renderFeedError(d) {
 
     // RESET PRICE ACTION PANEL
     renderPriceAction(d);
-    trace.length = 0;
 
-    draw();
+renderDecision(d);
+
+trace.length = 0;
+
+draw();
 }
 
 function renderPriceAction(d) {
@@ -237,6 +240,168 @@ function renderPriceAction(d) {
         renderBrain('SENSEX');
 }
 
+function renderDecision(d) {
+
+    const decisions =
+        d.brains?.decision;
+
+    if (!decisions) {
+
+    $("decisionStatus").textContent =
+        d.status || "MARKET CLOSED";
+
+    $("niftyDecision").innerHTML =
+        "Decision will appear when enough candles are available.";
+
+    $("sensexDecision").innerHTML =
+        "Decision will appear when enough candles are available.";
+
+    return;
+
+}
+
+    function render(symbol) {
+
+        const x =
+            decisions[symbol];
+
+        if (!x) {
+
+            return "No decision.";
+
+        }
+
+        let color =
+            "sideways";
+
+        if (x.bias === "CALL")
+            color = "up";
+
+        if (x.bias === "PUT")
+            color = "down";
+
+        return `
+
+            <div class="brain-direction ${color}">
+
+                ${x.state}
+
+            </div>
+
+            <div class="brain-stats">
+
+                <span>
+
+                    Bias
+
+                    <b>${x.bias}</b>
+
+                </span>
+
+                <span>
+
+                    Confidence
+
+                    <b>${x.confidence}%</b>
+
+                </span>
+
+                <span>
+
+                    Risk
+
+                    <b>${x.risk}</b>
+
+                </span>
+
+            </div>
+
+            <div class="brain-stats">
+
+                <span>
+
+                    Entry
+
+                    <b>
+
+                    ${x.entry_zone_low}
+
+                    -
+
+                    ${x.entry_zone_high}
+
+                    </b>
+
+                </span>
+
+            </div>
+
+            <div class="brain-stats">
+
+                <span>
+
+                    Stop
+
+                    <b>
+
+                    ${x.stop_loss}
+
+                    </b>
+
+                </span>
+
+                <span>
+
+                    Target
+
+                    <b>
+
+                    ${x.target1}
+
+                    </b>
+
+                </span>
+
+            </div>
+
+            <div class="brain-list">
+
+                <small>AI REASONS</small>
+
+                ${
+
+                    (x.reasons || [])
+
+                    .map(
+
+                        r=>`<div class="brain-reason">
+
+                        ✓ ${r}
+
+                        </div>`
+
+                    )
+
+                    .join("")
+
+                }
+
+            </div>
+
+        `;
+    }
+
+    $("decisionStatus").textContent =
+        "LIVE AI";
+
+    $("niftyDecision").innerHTML =
+        render("NIFTY");
+
+    $("sensexDecision").innerHTML =
+        render("SENSEX");
+
+}
+
 function render(d) {
 
     if (!d) {
@@ -368,6 +533,7 @@ function render(d) {
     ).join('');
 
     renderPriceAction(d);
+    renderDecision(d);
 
 
     $('newsScore').textContent =

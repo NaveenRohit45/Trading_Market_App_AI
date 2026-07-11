@@ -10,7 +10,11 @@ from backend.prediction.prediction_engine import predict, combined_verdict
 from backend.services.database import Database
 from backend.data.demo_provider import DemoProvider
 from backend.data.groww_provider import GrowwProvider
-from backend.brains.price_action_brain import PriceActionBrain
+from backend.brains.price_action.price_action_brain import PriceActionBrain
+from backend.decision.trade_decision_engine import (
+    DecisionContext,
+    trade_decision_engine,
+)
 
 
 class MarketService:
@@ -31,6 +35,13 @@ class MarketService:
 
         self.latest = {}
 
+        self.last_live_brains = {
+            "price_action": {},
+            "decision": {},
+        }
+
+        self.last_status = None
+
         self.last_prediction = 0
         self.last_alert_key = None
 
@@ -40,6 +51,14 @@ class MarketService:
         self.alerts = deque(maxlen=20)
 
         self.loop_task = None
+
+        self.last_live_brains = {
+
+            "price_action": {},
+
+            "decision": {},
+
+        }
 
 
     async def start(self):
@@ -268,7 +287,11 @@ class MarketService:
             prices,
             now,
         )
-
+        # Save last live AI brains
+        self.last_live_brains = self.latest.get(
+            "brains",
+            self.last_live_brains,
+        )
 
         if (
             now - self.last_prediction
@@ -317,7 +340,6 @@ class MarketService:
                 "timestamp"
             )
         )
-
 
         # --------------------------------------------------
         # SAVED LAST MARKET VALUES AVAILABLE
@@ -376,7 +398,6 @@ class MarketService:
 
                 "experimental": True,
             }
-
 
             print(
                 "🌙 MARKET CLOSED | "
@@ -462,6 +483,9 @@ class MarketService:
             "prices": {},
 
             "analysis": {},
+
+            "brains": self.last_live_brains,
+
             "forecast": {},
             "combined": None,
 
@@ -506,6 +530,7 @@ class MarketService:
             )
         }
         price_action = {
+
             symbol: self.price_action_brain.analyze(
                 symbol=symbol,
 
@@ -536,7 +561,7 @@ class MarketService:
                 "SENSEX",
             )
         }
-
+        trade_decisions = {}
         # ADD THE PRINT HERE
         print(
             "🧠 PRICE ACTION |",
@@ -564,7 +589,29 @@ class MarketService:
             peer = analyses[
                 peer_symbol
             ]
+            analysis = analyses[symbol]
 
+            ctx = DecisionContext(
+
+                symbol=symbol,
+                price=prices[symbol],
+                support=analysis.get("support"),
+                resistance=analysis.get("resistance"),
+                atr=analysis.get("atr", 10),
+                price_action=price_action[symbol],
+                timestamp=now,
+
+            )
+
+            trade_decisions[symbol] = (
+
+                trade_decision_engine
+
+                .decide(ctx)
+
+                .to_dict()
+
+            )
 
             forecasts[symbol] = [
                 predict(
@@ -592,9 +639,11 @@ class MarketService:
 
             "analysis": analyses,
 
-            "brains": {
-                "price_action": price_action,
-            },
+            "analysis": {},
+
+            "brains": self.last_live_brains,
+
+            "forecast": {},
 
             "forecast": forecasts,
 
@@ -625,7 +674,6 @@ class MarketService:
     ):
 
         if not self.latest:
-
             return
 
 
@@ -660,7 +708,6 @@ class MarketService:
     ):
 
         if not self.latest:
-
             return
 
 
@@ -671,14 +718,12 @@ class MarketService:
 
             return
 
-
         combined = self.latest.get(
             "combined"
         )
 
 
         if not combined:
-
             return
 
 
@@ -711,9 +756,7 @@ class MarketService:
                 }
             )
 
-
         self.last_alert_key = key
-
 
     async def broadcast(
         self,
@@ -724,25 +767,19 @@ class MarketService:
 
 
         for websocket in self.clients:
-
             try:
-
                 await websocket.send_json(
                     payload
                 )
 
             except Exception:
-
                 dead_clients.append(
                     websocket
                 )
 
-
         for websocket in dead_clients:
-
             self.clients.discard(
                 websocket
             )
-
 
 service = MarketService()
