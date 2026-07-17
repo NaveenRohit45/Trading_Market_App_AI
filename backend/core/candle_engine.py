@@ -2,7 +2,7 @@ from collections import defaultdict, deque
 from backend.models import Candle
 
 class CandleEngine:
-    def __init__(self, maxlen=600):
+    def __init__(self, maxlen=5000):
         self.candles = defaultdict(lambda: deque(maxlen=maxlen))
         self.current = {}
 
@@ -28,3 +28,27 @@ class CandleEngine:
         c = self.current.get((symbol, interval))
         if include_current and c: out.append(c)
         return out
+
+    # ==========================================================
+    # Load Historical Candles
+    # ==========================================================
+
+    def load_history(
+            self,
+            symbol,
+            interval,
+            candles,
+    ):
+        """
+        Load completed historical candles into the engine.
+        """
+
+        key = (symbol, interval)
+
+        self.candles[key].clear()
+
+        for candle in candles:
+            self.candles[key].append(candle)
+
+        # No current candle yet.
+        self.current.pop(key, None)

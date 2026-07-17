@@ -9,14 +9,21 @@ class Database:
             c.execute('''CREATE TABLE IF NOT EXISTS predictions(
               id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, symbol TEXT, horizon INTEGER,
               price REAL, direction TEXT, confidence REAL, payload TEXT,
+              features TEXT,
               resolved INTEGER DEFAULT 0, actual_direction TEXT, correct INTEGER)''')
+            # Add the column if the DB already existed from before this change.
+            try:
+                c.execute("ALTER TABLE predictions ADD COLUMN features TEXT")
+            except sqlite3.OperationalError:
+                pass
 
     def conn(self): return sqlite3.connect(self.path)
 
-    def add_prediction(self, ts, symbol, horizon, price, pred):
+    def add_prediction(self, ts, symbol, horizon, price, pred, features=None):
         with self.conn() as c:
-            c.execute("INSERT INTO predictions(ts,symbol,horizon,price,direction,confidence,payload) VALUES(?,?,?,?,?,?,?)",
-                      (ts,symbol,horizon,price,pred["direction"],pred["confidence"],json.dumps(pred)))
+            c.execute("INSERT INTO predictions(ts,symbol,horizon,price,direction,confidence,payload,features) VALUES(?,?,?,?,?,?,?,?)",
+                      (ts,symbol,horizon,price,pred["direction"],pred["confidence"],json.dumps(pred),
+                       json.dumps(features) if features else None))
 
     def resolve(self, now, prices):
         with self.conn() as c:

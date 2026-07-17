@@ -6,6 +6,7 @@ from pathlib import Path
 from growwapi import GrowwAPI, GrowwFeed
 
 from backend.config import settings
+from backend.models import Candle
 
 
 class GrowwProvider:
@@ -61,6 +62,80 @@ class GrowwProvider:
 
     async def start(self):
         pass
+
+
+    def get_historical_candles(self, symbol, interval_minutes=1, days_back=5):
+        """
+        Fetch historical candles directly from Groww (no Yahoo Finance).
+        Returns a list of dicts: {start_ts, open, high, low, close, volume}
+        sorted oldest -> newest, or [] on any failure.
+        """
+
+        from datetime import datetime, timedelta
+
+        symbol_map = {
+            "NIFTY": {"exchange": "NSE", "segment": "CASH", "groww_symbol": "NIFTY"},
+            "SENSEX": {"exchange": "BSE", "segment": "CASH", "groww_symbol": "SENSEX"},
+        }
+
+        if symbol not in symbol_map:
+            print(f"⚠️ No Groww symbol mapping for {symbol}")
+            return []
+
+        cfg = symbol_map[symbol]
+
+        end_time = datetime.now()
+        start_time = end_time - timedelta(days=days_back)
+
+        interval_str = f"{interval_minutes}minute"
+
+        try:
+            response = self.groww.get_historical_candles(
+                exchange=cfg["exchange"],
+                segment=cfg["segment"],
+                groww_symbol=cfg["groww_symbol"],
+                start_time=start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                end_time=end_time.strftime("%Y-%m-%d %H:%M:%S"),
+                candle_interval=interval_str,
+            )
+        except Exception as error:
+            print(f"⚠️ Groww historical fetch failed for {symbol}: {error}")
+            return []
+
+        raw_candles = response.get("candles", []) if isinstance(response, dict) else []
+
+        if not raw_candles:
+            print(f"⚠️ Groww returned no historical candles for {symbol}")
+            return []
+
+        candles = []
+
+        for row in raw_candles:
+            try:
+                ts, o, h, l, c = row[0], row[1], row[2], row[3], row[4]
+                vol = row[5] if len(row) > 5 else 0.0
+
+                ts = float(ts)
+                if ts > 10_000_000_000:
+                    ts = ts / 1000.0
+
+                candles.append(Candle(
+                    symbol=symbol,
+                    start_ts=ts,
+                    open=float(o),
+                    high=float(h),
+                    low=float(l),
+                    close=float(c),
+                    volume=float(vol),
+                ))
+            except (IndexError, TypeError, ValueError):
+                continue
+
+        candles.sort(key=lambda x: x.start_ts)
+
+        print(f"✅ Groww historical: {len(candles)} x {interval_minutes}m candles for {symbol}")
+
+        return candles
 
 
     async def stop(self):

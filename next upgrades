@@ -8,3 +8,234 @@ Heavy Call Writing & Heavy Put Writing (tests OIAnalyzer)
 Premium Bullish & Premium Bearish (tests PremiumFlowAnalyzer)
 Conflicting (tests OptionsBrain)
 Edge cases (empty_chain, zero_oi_chain, etc.)
+
+
+
+✅ session_analyzer.py (time-based, simplest)
+gap_analyzer.py
+volatility_analyzer.py
+liquidity_analyzer.py
+trend_analyzer.py
+market_strength.py
+expiry_analyzer.py
+live_market_brain.py (orchestrator)
+test_live_market_brain.py
+
+signal_fusion.py      ← NEW
+strategy_selector.py  ← NEW
+confidence.py         ← NEW
+market_context.py
+
+Probability Engine
+Risk Adaptation Engine
+Market Regime Detection
+Agreement Engine
+Strategy Library
+strategies/
+
+trend_following.py
+
+breakout.py
+
+reversal.py
+
+expiry.py
+
+range.py
+
+momentum.py
+
+scalping.py
+
+Market Memory
+
+Learning Engine
+
+News Brain
+
+Global Market Brain
+
+Explainable AI
+
+backend/
+│
+├── brains/
+│
+│   ├── global_market/
+│   │
+│   ├── __init__.py
+│   ├── models.py
+│   ├── us_market_analyzer.py
+│   ├── asian_market_analyzer.py
+│   ├── gift_nifty_analyzer.py
+│   ├── vix_analyzer.py
+│   ├── currency_analyzer.py
+│   ├── commodity_analyzer.py
+│   ├── global_sentiment.py
+│   ├── global_market_brain.py
+│   └── test_global_market_brain.py
+
+
+backend/
+    brains/
+        learning/
+
+            __init__.py
+
+            models.py
+
+            trade_memory.py
+
+            pattern_memory.py
+
+            outcome_tracker.py
+
+            confidence_optimizer.py
+
+            mistake_analyzer.py
+
+            strategy_learning.py
+
+            learning_brain.py
+
+            storage.py
+
+            statistics.py
+
+learning/
+
+    pattern_memory.py          ⭐⭐⭐⭐⭐
+
+    statistics.py
+
+    confidence_optimizer.py
+
+    strategy_learning.py
+
+    mistake_analyzer.py
+
+storage.py
+
+Part 1 ✅
+Imports
+Connection Pool
+Transaction Manager
+Database Version
+WAL Mode
+Foreign Keys
+
+Part 2
+Schema Creation
+
+Part 3
+Prediction Repository
+
+Part 4
+Outcome Repository
+
+Part 5
+Pattern Repository
+
+Part 6
+Statistics Repository
+
+Part 7
+Optimization
+Backup
+Migration
+
+Part 8
+Utility APIs
+
+
+backend/
+└── brains/
+    └── learning/
+        ├── feature_extractor.py      ⭐
+        ├── fingerprint.py            ⭐
+        ├── similarity_engine.py      ⭐
+        ├── pattern_memory.py
+        ├── confidence_optimizer.py
+        ├── strategy_learning.py
+        └── learning_brain.py
+
+
+
+
+
+Gap Percentage  -- YTS
+VWAP Position
+Opening Range Breakout
+Volume Bucket
+Liquidity Bucket
+RSI Zone
+MACD Trend
+ADX Trend
+OI Change
+PCR Bucket
+IV Bucket
+Expiry Day
+Day of Week
+Hour of Day
+Month
+Support Strength
+Resistance Strength
+Candle Pattern
+Market Regime
+Volatility Regime
+
+
+PatternMemory.py
+
+Phase 1 ✅
+Basic Engine
+
+██████████████
+
+Phase 2 ⭐⭐⭐⭐⭐
+Pattern Index
+
+Phase 3 ⭐⭐⭐⭐⭐
+Pattern Cache
+
+Phase 4
+Pattern Ranking
+
+Phase 5
+Learning Update
+
+Phase 6
+Pattern Aging
+
+Phase 7
+Pattern Cleanup
+
+Phase 8
+Performance
+
+Phase 9
+Explainability
+
+Phase 10
+Final Production
+
+historical_provider.py
+candle_builder.py
+historical_loader.py
+market_service.py
+
+✅ Build historical_provider.py using Finnhub.
+✅ Build a 1-minute → 3-minute candle aggregator.
+✅ Integrate it with historical_loader.py.
+✅ Update market_service.py to preload the Candle Engine.
+✅ Verify the dashboard comes up immediately after startup.
+
+Strategy Recommendation ⭐⭐⭐⭐⭐ (Highest Priority)
+ Adaptive Risk Engine ⭐⭐⭐⭐⭐
+ Position Size Learning ⭐⭐⭐⭐⭐
+ Stop Loss Learning
+  Take Profit Learning
+  Strategy Confidence
+  Brain Voting
+  Market Regime Learning
+  Strategy Decay

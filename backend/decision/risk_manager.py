@@ -196,6 +196,18 @@ class RiskManager:
 
         result = RiskAssessment()
 
+        print("=" * 60)
+        # print("RISK MANAGER INPUT")
+        print("=" * 60)
+
+        print("Direction :", direction)
+        print("Price     :", price)
+        print("Support   :", support)
+        print("Resistance:", resistance)
+        print("ATR       :", atr)
+        print("Confidence:", confidence)
+        print()
+
         result.entry = price
 
         result.confidence = confidence
@@ -239,6 +251,12 @@ class RiskManager:
         result.target1 = t1
 
         result.target2 = t2
+
+        print("ENTRY :", result.entry)
+        print("STOP  :", result.stop_loss)
+        print("T1    :", result.target1)
+        print("T2    :", result.target2)
+        print("=" * 60)
 
 
         # ----------------------------------------------

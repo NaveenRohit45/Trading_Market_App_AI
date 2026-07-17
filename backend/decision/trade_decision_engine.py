@@ -76,11 +76,80 @@ class TradeDecisionEngine:
     # ------------------------------------------------------
 
     def decide(
-        self,
-        ctx: DecisionContext,
+            self,
+            ctx: DecisionContext,
     ) -> TradeDecision:
 
         pa = ctx.price_action
+
+        # --------------------------------------------------
+        # PRICE ACTION SETUP
+        # --------------------------------------------------
+
+        setup = pa.get(
+            "setup",
+            "WAIT",
+        )
+
+        # --------------------------------------------------
+        # BUILD DECISION
+        # --------------------------------------------------
+
+        d = TradeDecision()
+
+        d.symbol = ctx.symbol
+
+        d.timestamp = ctx.timestamp
+
+        d.market_condition = self._market_condition(
+            pa["direction"]
+        )
+
+        d.source_brains = [
+            "PRICE_ACTION",
+        ]
+
+        # ==================================================
+        # NO SETUP -> WAIT (DO NOT CALCULATE RISK)
+        # ==================================================
+
+        if setup == "WAIT":
+            d.state = TradeState.WAIT
+
+            d.bias = TradeBias.NONE
+
+            # d.risk = "--"
+
+            d.confidence = pa.get(
+                "confidence",
+                0,
+            )
+
+            d.entry_price = None
+            d.entry_zone_low = None
+            d.entry_zone_high = None
+            d.stop_loss = None
+            d.target1 = None
+            d.target2 = None
+            d.expected_points = None
+            d.expected_move_minutes = None
+
+            d.reasons.extend(
+                pa.get(
+                    "reasons",
+                    [],
+                )
+            )
+
+            d.reasons.append(
+                "Price Action Brain suggests waiting."
+            )
+
+            return d
+
+        # ==================================================
+        # BUILD OPINIONS
+        # ==================================================
 
         opinions = {
 
@@ -107,17 +176,17 @@ class TradeDecisionEngine:
 
         }
 
-        # --------------------------------------------------
+        # ==================================================
         # CONFIDENCE
-        # --------------------------------------------------
+        # ==================================================
 
         conf = confidence_engine.calculate(
             opinions
         )
 
-        # --------------------------------------------------
+        # ==================================================
         # RISK
-        # --------------------------------------------------
+        # ==================================================
 
         risk = risk_manager.assess(
 
@@ -135,19 +204,32 @@ class TradeDecisionEngine:
 
         )
 
-        # --------------------------------------------------
-        # BUILD DECISION
-        # --------------------------------------------------
+        # ==================================================
+        # RISK MANAGER
+        # ==================================================
 
-        d = TradeDecision()
+        if not risk.can_trade:
+            d.state = TradeState.AVOID
 
-        d.symbol = ctx.symbol
+            d.bias = TradeBias.NONE
 
-        d.timestamp = ctx.timestamp
+            d.confidence = conf.confidence
 
-        d.market_condition = self._market_condition(
-            pa["direction"]
-        )
+            d.risk = risk.risk_level
+
+            d.warnings.extend(
+                risk.warnings
+            )
+
+            d.warnings.append(
+                "Risk Manager rejected trade."
+            )
+
+            return d
+
+        # ==================================================
+        # DECISION
+        # ==================================================
 
         d.confidence = conf.confidence
 
@@ -172,23 +254,16 @@ class TradeDecisionEngine:
         # --------------------------------------------------
 
         if d.entry_price is not None:
-
             spread = ctx.atr * 0.20
 
             d.entry_zone_low = round(
-
                 d.entry_price - spread,
-
                 2,
-
             )
 
             d.entry_zone_high = round(
-
                 d.entry_price + spread,
-
                 2,
-
             )
 
         # --------------------------------------------------
@@ -197,14 +272,13 @@ class TradeDecisionEngine:
 
         if (
 
-            d.entry_price is not None
+                d.entry_price is not None
 
-            and
+                and
 
-            d.target1 is not None
+                d.target1 is not None
 
         ):
-
             d.expected_points = round(
 
                 abs(
@@ -228,71 +302,16 @@ class TradeDecisionEngine:
         # --------------------------------------------------
 
         d.reasons.extend(
-
             conf.reasons
-
         )
 
         d.warnings.extend(
-
             risk.warnings
-
         )
 
         d.contradictions.extend(
-
             conf.warnings
-
         )
-
-        # --------------------------------------------------
-        # SOURCE BRAINS
-        # --------------------------------------------------
-
-        d.source_brains = [
-
-            "PRICE_ACTION",
-
-        ]
-
-        # --------------------------------------------------
-        # PRICE ACTION SETUP
-        # --------------------------------------------------
-
-        setup = pa.get(
-            "setup",
-            "WAIT",
-        )
-
-        # --------------------------------------------------
-        # NO SETUP -> WAIT
-        # --------------------------------------------------
-
-        if setup == "WAIT":
-            d.state = TradeState.WAIT
-
-            d.bias = TradeBias.NONE
-
-            d.reasons.append(
-                "Price Action Brain suggests waiting."
-            )
-
-            return d
-
-        # --------------------------------------------------
-        # RISK MANAGER
-        # --------------------------------------------------
-
-        if not risk.can_trade:
-            d.state = TradeState.AVOID
-
-            d.bias = TradeBias.NONE
-
-            d.warnings.append(
-                "Risk Manager rejected trade."
-            )
-
-            return d
 
         # --------------------------------------------------
         # BIAS
@@ -311,7 +330,7 @@ class TradeDecisionEngine:
             d.bias = TradeBias.NONE
 
         # --------------------------------------------------
-        # CONFIDENCE
+        # STATE
         # --------------------------------------------------
 
         if conf.confidence < self.ready_threshold:
@@ -319,27 +338,15 @@ class TradeDecisionEngine:
             d.state = TradeState.WAIT
 
             d.warnings.append(
-
                 "Confidence below READY threshold."
-
             )
 
-        elif (
-
-            conf.confidence
-
-            <
-
-            self.enter_threshold
-
-        ):
+        elif conf.confidence < self.enter_threshold:
 
             d.state = TradeState.READY
 
             d.reasons.append(
-
                 "Setup is forming."
-
             )
 
         else:
@@ -347,12 +354,12 @@ class TradeDecisionEngine:
             d.state = TradeState.ENTER
 
             d.reasons.append(
-
                 "All conditions satisfied."
-
             )
 
         return d
+
+
 
 
 # ==========================================================

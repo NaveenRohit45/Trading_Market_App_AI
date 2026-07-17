@@ -14,6 +14,28 @@
 <div class="card index"><h3>SENSEX</h3><div class="price" id="sensexPrice">--</div><div class="state" id="sensexState">WARMING UP</div><div class="mini"><span>Support <b id="sensexSupport">--</b></span><span>Resistance <b id="sensexResistance">--</b></span></div></div>
 <div class="card prediction"><h3>AI PREDICTION SUMMARY <em>EXPERIMENTAL</em></h3><table><thead><tr><th>Time</th><th>UP</th><th>DOWN</th><th>SIDEWAYS</th><th>Confidence</th></tr></thead><tbody id="predRows"></tbody></table><div class="verdict">AI VERDICT: <b id="verdict">NO-TRADE</b><span id="confirm">MIXED</span></div></div>
 </section>
+<section class="grid ai-summary-section">
+<div class="card ai-summary-card">
+    <div class="cardhead">
+        <h3>🧠 REAL AI ANALYSIS <em>Claude Reasoning</em></h3>
+        <span id="aiSummaryStatus">WAITING FOR FIRST CYCLE</span>
+    </div>
+    <div class="ai-summary-grid">
+        <div class="ai-summary-block">
+            <h4>NIFTY 50</h4>
+            <div id="niftyAiSummary" class="ai-summary-text">
+                Waiting for first AI reasoning cycle (runs every ~3 minutes)...
+            </div>
+        </div>
+        <div class="ai-summary-block">
+            <h4>SENSEX</h4>
+            <div id="sensexAiSummary" class="ai-summary-text">
+                Waiting for first AI reasoning cycle (runs every ~3 minutes)...
+            </div>
+        </div>
+    </div>
+</div>
+</section>
 <section class="grid middle">
 <div class="card chart"><div class="cardhead"><h3>NIFTY 50 — LIVE TRACE</h3><span>1m engine</span></div><canvas id="chart"></canvas><div class="warning">V1 probabilities are heuristic shadow forecasts. Validate accuracy before trusting them.</div></div>
 <div class="card analysis"><h3>MARKET ANALYSIS</h3><div id="analysisRows"></div></div>
@@ -94,8 +116,83 @@
         </div>
 
     </div>
+</section>
+<section class="live-market-section">
+
+    <div class="card live-market-card">
+
+        <div class="cardhead">
+
+            <h3>🌍 LIVE MARKET BRAIN</h3>
+
+            <span id="liveMarketStatus">
+
+                WAITING FOR LIVE MARKET
+
+            </span>
+
+        </div>
+
+        <div class="price-action-grid">
+
+            <div class="brain-index">
+
+                <h3>NIFTY 50</h3>
+
+                <div id="niftyLiveMarket">
+
+                    Waiting for AI...
+
+                </div>
+
+            </div>
+
+            <div class="brain-index">
+
+                <h3>SENSEX</h3>
+
+                <div id="sensexLiveMarket">
+
+                    Waiting for AI...
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+</section>
+<section class="global-market-section">
+
+    <div class="card global-market-card">
+
+        <div class="cardhead">
+
+            <h3>🌎 GLOBAL MARKET BRAIN</h3>
+
+            <span id="globalMarketStatus">
+
+                WAITING FOR GLOBAL MARKET
+
+            </span>
+
+        </div>
+
+        <div class="brain-index">
+
+            <div id="globalMarket">
+
+                Waiting for Global Market Brain...
+
+            </div>
+
+        </div>
+
+    </div>
 
 </section>
+
 <section class="grid bottom">
 <div class="card"><h3>PREDICTION ACCURACY</h3><div id="accuracy">Waiting for predictions to mature...</div></div>
 <div class="card"><h3>RECENT AI ALERTS</h3><div id="alerts">No meaningful state change yet.</div></div>

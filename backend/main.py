@@ -45,10 +45,28 @@ def add_news(item:NewsInput):
     return {"ok":True}
 
 @app.websocket("/ws")
-async def ws_endpoint(ws:WebSocket):
+async def ws_endpoint(ws: WebSocket):
+
+    print("🔵 WebSocket connection request")
+
     await ws.accept()
+
+    print("🟢 WebSocket accepted")
+
     service.clients.add(ws)
+
+    print(f"👥 Total Clients: {len(service.clients)}")
+
     try:
-        while True: await ws.receive_text()
-    except:
+
+        while True:
+
+            msg = await ws.receive_text()
+
+            print("📨 Received:", msg)
+
+    except Exception as e:
+
+        print("🔴 WebSocket disconnected:", e)
+
         service.clients.discard(ws)

@@ -1,282 +1,271 @@
 """
-============================================================
 Trading Market AI
-Trade Decision Engine Test
-============================================================
+
+Trade Decision Engine Regression Test
+
+Tests:
+
+✓ CALL setup
+✓ PUT setup
+✓ WAIT state
+✓ Low confidence
+✓ High confidence
+✓ Entry / Stop / Target
+✓ Reward Risk Ratio
 """
+
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.decision.trade_decision_engine import (
     DecisionContext,
     trade_decision_engine,
 )
 
+
 # ==========================================================
-# HELPER
+# Pretty Printer
 # ==========================================================
 
-def print_result(title, decision):
+LINE = "=" * 80
 
-    print("\n" + "=" * 75)
+
+def show(title):
+
+    print()
+    print(LINE)
     print(title)
-    print("=" * 75)
+    print(LINE)
 
-    print("STATE           :", decision.state.value)
-    print("BIAS            :", decision.bias.value)
-    print("CONFIDENCE      :", decision.confidence)
-    print("RISK            :", decision.risk.value)
-    print("MARKET          :", decision.market_condition.value)
 
-    print("\nENTRY")
+def print_decision(d):
 
-    print("Entry           :", decision.entry_price)
-    print("Entry Zone      :", decision.entry_zone_low,
-          "-", decision.entry_zone_high)
+    print("State        :", d.state.value)
+    print("Bias         :", d.bias.value)
 
-    print("Stop Loss       :", decision.stop_loss)
+    print("Confidence   :", d.confidence)
 
-    print("Target 1        :", decision.target1)
-    print("Target 2        :", decision.target2)
+    print("Risk         :", d.risk.value)
 
-    print("Expected Points :", decision.expected_points)
+    print()
 
-    print("Reward / Risk   :", decision.reward_risk_ratio)
+    print("Entry        :", d.entry_price)
 
-    print("\nREASONS")
+    print("Entry Zone   :", d.entry_zone_low, "-", d.entry_zone_high)
 
-    if decision.reasons:
+    print("Stop Loss    :", d.stop_loss)
 
-        for r in decision.reasons:
+    print("Target 1     :", d.target1)
 
-            print("  +", r)
+    print("Target 2     :", d.target2)
 
-    else:
+    print("RR Ratio     :", d.reward_risk_ratio)
 
-        print("  None")
+    print()
 
-    print("\nWARNINGS")
+    print("Reasons")
 
-    if decision.warnings:
+    for r in d.reasons:
 
-        for w in decision.warnings:
+        print("  ✓", r)
 
-            print("  -", w)
+    if d.warnings:
 
-    else:
+        print()
 
-        print("  None")
+        print("Warnings")
 
-    print("\nCONTRADICTIONS")
+        for w in d.warnings:
 
-    if decision.contradictions:
-
-        for c in decision.contradictions:
-
-            print("  -", c)
-
-    else:
-
-        print("  None")
-
-    print("\nSOURCE BRAINS")
-
-    print(decision.source_brains)
+            print("  ⚠", w)
 
 
 # ==========================================================
-# TEST 1
+# Scenario Builder
 # ==========================================================
 
-ctx = DecisionContext(
+def build_context(
 
-    symbol="NIFTY",
+        direction,
 
-    price=24240,
+        setup,
 
-    support=24220,
+        confidence,
 
-    resistance=24280,
+        price=25000,
 
-    atr=10,
+        support=24950,
 
-    price_action={
+        resistance=25080,
 
-        "direction": "BULLISH",
+        atr=20,
 
-        "confidence": 92,
+):
 
-        "setup": "CALL_SETUP",
+    return DecisionContext(
 
-        "reasons": [
+        symbol="NIFTY",
 
-            "Strong bullish structure",
+        price=price,
 
-            "Momentum increasing",
+        support=support,
 
-        ],
+        resistance=resistance,
 
-        "contradictions": [],
+        atr=atr,
 
-    },
+        timestamp=0,
+
+        price_action={
+
+            "direction": direction,
+
+            "confidence": confidence,
+
+            "setup": setup,
+
+            "reasons": [
+
+                "Regression Test"
+
+            ],
+
+            "contradictions": []
+
+        }
+
+    )
+
+
+# ==========================================================
+# CALL
+# ==========================================================
+
+show("CALL SETUP")
+
+ctx = build_context(
+
+    direction="BULLISH",
+
+    setup="CALL_SETUP",
+
+    confidence=90,
 
 )
 
 decision = trade_decision_engine.decide(ctx)
 
-print_result(
-
-    "TEST 1 - STRONG CALL",
-
-    decision,
-
-)
+print_decision(decision)
 
 
 # ==========================================================
-# TEST 2
+# PUT
 # ==========================================================
 
-ctx = DecisionContext(
+show("PUT SETUP")
 
-    symbol="NIFTY",
+ctx = build_context(
 
-    price=24240,
+    direction="BEARISH",
 
-    support=24220,
+    setup="PUT_SETUP",
 
-    resistance=24280,
-
-    atr=10,
-
-    price_action={
-
-        "direction": "BEARISH",
-
-        "confidence": 90,
-
-        "setup": "PUT_SETUP",
-
-        "reasons": [
-
-            "Breakdown",
-
-        ],
-
-        "contradictions": [],
-
-    },
+    confidence=90,
 
 )
 
 decision = trade_decision_engine.decide(ctx)
 
-print_result(
-
-    "TEST 2 - STRONG PUT",
-
-    decision,
-
-)
+print_decision(decision)
 
 
 # ==========================================================
-# TEST 3
+# WAIT
 # ==========================================================
 
-ctx = DecisionContext(
+show("WAIT")
 
-    symbol="NIFTY",
+ctx = build_context(
 
-    price=24240,
+    direction="NEUTRAL",
 
-    support=24220,
+    setup="WAIT",
 
-    resistance=24280,
-
-    atr=10,
-
-    price_action={
-
-        "direction": "NEUTRAL",
-
-        "confidence": 30,
-
-        "setup": "WAIT",
-
-        "reasons": [],
-
-        "contradictions": [
-
-            "Choppy Market",
-
-        ],
-
-    },
+    confidence=10,
 
 )
 
 decision = trade_decision_engine.decide(ctx)
 
-print_result(
-
-    "TEST 3 - WAIT",
-
-    decision,
-
-)
+print_decision(decision)
 
 
 # ==========================================================
-# TEST 4
+# LOW CONFIDENCE
 # ==========================================================
 
-ctx = DecisionContext(
+show("LOW CONFIDENCE")
 
-    symbol="NIFTY",
+ctx = build_context(
 
-    price=24240,
+    direction="BULLISH",
 
-    support=24239,
+    setup="CALL_SETUP",
 
-    resistance=24242,
-
-    atr=40,
-
-    price_action={
-
-        "direction": "BULLISH",
-
-        "confidence": 65,
-
-        "setup": "CALL_SETUP",
-
-        "reasons": [
-
-            "Weak setup",
-
-        ],
-
-        "contradictions": [
-
-            "High volatility",
-
-        ],
-
-    },
+    confidence=40,
 
 )
 
 decision = trade_decision_engine.decide(ctx)
 
-print_result(
+print_decision(decision)
 
-    "TEST 4 - READY / AVOID",
 
-    decision,
+# ==========================================================
+# READY
+# ==========================================================
+
+show("READY")
+
+ctx = build_context(
+
+    direction="BULLISH",
+
+    setup="CALL_SETUP",
+
+    confidence=75,
 
 )
 
+decision = trade_decision_engine.decide(ctx)
 
-print("\n")
-print("=" * 75)
-print("TRADE DECISION ENGINE TEST COMPLETED")
-print("=" * 75)
+print_decision(decision)
+
+
+# ==========================================================
+# ENTER
+# ==========================================================
+
+show("ENTER")
+
+ctx = build_context(
+
+    direction="BULLISH",
+
+    setup="CALL_SETUP",
+
+    confidence=95,
+
+)
+
+decision = trade_decision_engine.decide(ctx)
+
+print_decision(decision)
+
+print()
+print(LINE)
+print("Regression Finished")
+print(LINE)

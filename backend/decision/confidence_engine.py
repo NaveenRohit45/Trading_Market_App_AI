@@ -179,23 +179,24 @@ class ConfidenceEngine:
             / len(opinions)
         ) * 100
 
-
         # ----------------------------------------------
-        # BONUS
+        # AGREEMENT BONUS
+        # Give bonus only when multiple brains exist.
         # ----------------------------------------------
 
-        if agreement >= 100:
+        if len(opinions) >= 2:
 
-            confidence += 12
+            if agreement >= 100:
 
-        elif agreement >= 80:
+                confidence += 12
 
-            confidence += 8
+            elif agreement >= 80:
 
-        elif agreement >= 60:
+                confidence += 8
 
-            confidence += 3
+            elif agreement >= 60:
 
+                confidence += 3
 
         # ----------------------------------------------
         # PENALTY

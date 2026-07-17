@@ -30,6 +30,16 @@ class Settings(BaseModel):
         ""
     )
 
+    finnhub_api_key: str = os.getenv(
+        "FINNHUB_API_KEY",
+        ""
+    )
+
+    anthropic_api_key: str = os.getenv(
+        "ANTHROPIC_API_KEY",
+        ""
+    )
+
     poll_seconds: int = int(
         os.getenv(
             "POLL_SECONDS",
