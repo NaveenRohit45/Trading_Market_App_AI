@@ -17,7 +17,33 @@ class Database:
             except sqlite3.OperationalError:
                 pass
 
+            # Raw 1-minute candle history -- needed for the LSTM
+            # (train_lstm.py) which learns from candle SEQUENCES, not
+            # single snapshots like the RandomForest does.
+            c.execute('''CREATE TABLE IF NOT EXISTS candles(
+              symbol TEXT, ts REAL, open REAL, high REAL, low REAL,
+              close REAL, volume REAL,
+              PRIMARY KEY (symbol, ts))''')
+
+            # Per-brain call tracking -- this is what lets the
+            # Confidence Engine adapt itself instead of using fixed
+            # weights forever. Every brain's directional call gets
+            # logged here and resolved the same way predictions are,
+            # so we can compute EACH BRAIN'S OWN rolling accuracy.
+            c.execute('''CREATE TABLE IF NOT EXISTS brain_calls(
+              id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, symbol TEXT,
+              brain TEXT, horizon INTEGER, price REAL, direction TEXT,
+              regime TEXT,
+              resolved INTEGER DEFAULT 0, actual_direction TEXT, correct INTEGER)''')
+
     def conn(self): return sqlite3.connect(self.path)
+
+    def add_candle(self, symbol, ts, open_, high, low, close, volume=0.0):
+        with self.conn() as c:
+            c.execute(
+                "INSERT OR IGNORE INTO candles(symbol,ts,open,high,low,close,volume) VALUES(?,?,?,?,?,?,?)",
+                (symbol, ts, open_, high, low, close, volume),
+            )
 
     def add_prediction(self, ts, symbol, horizon, price, pred, features=None):
         with self.conn() as c:
@@ -35,6 +61,61 @@ class Database:
                     actual = "UP" if pct > 0.03 else "DOWN" if pct < -0.03 else "SIDEWAYS"
                     c.execute("UPDATE predictions SET resolved=1,actual_direction=?,correct=? WHERE id=?",
                               (actual, int(actual==direction), rid))
+
+    def add_brain_call(self, ts, symbol, brain, horizon, price, direction, regime=None):
+        with self.conn() as c:
+            c.execute(
+                "INSERT INTO brain_calls(ts,symbol,brain,horizon,price,direction,regime) VALUES(?,?,?,?,?,?,?)",
+                (ts, symbol, brain, horizon, price, direction, regime),
+            )
+
+    def resolve_brain_calls(self, now, prices):
+        with self.conn() as c:
+            rows = c.execute(
+                "SELECT id,ts,symbol,horizon,price,direction FROM brain_calls WHERE resolved=0"
+            ).fetchall()
+            for rid, ts, sym, h, p0, direction in rows:
+                if now - ts >= h * 60 and sym in prices:
+                    p1 = prices[sym]
+                    pct = (p1 - p0) / p0 * 100 if p0 else 0
+                    actual = "UP" if pct > 0.03 else "DOWN" if pct < -0.03 else "SIDEWAYS"
+                    c.execute(
+                        "UPDATE brain_calls SET resolved=1,actual_direction=?,correct=? WHERE id=?",
+                        (actual, int(actual == direction), rid),
+                    )
+
+    def brain_accuracy(self, symbol=None, regime=None, lookback=100):
+        """
+        Rolling accuracy per brain -- the actual numbers the Adaptive
+        Confidence Engine uses to reweight itself. Optionally filtered
+        by symbol and/or market regime, since a brain that is great in
+        a trending market may be bad in a ranging one.
+        """
+        query = "SELECT brain, direction, actual_direction, correct, ts FROM brain_calls WHERE resolved=1"
+        params = []
+        if symbol:
+            query += " AND symbol=?"
+            params.append(symbol)
+        if regime:
+            query += " AND regime=?"
+            params.append(regime)
+        query += " ORDER BY ts DESC"
+
+        with self.conn() as c:
+            rows = c.execute(query, params).fetchall()
+
+        per_brain = {}
+        for brain, direction, actual, correct, ts in rows:
+            per_brain.setdefault(brain, []).append(correct)
+
+        results = {}
+        for brain, outcomes in per_brain.items():
+            recent = outcomes[:lookback]
+            results[brain] = {
+                "accuracy": round(100 * sum(recent) / len(recent), 1) if recent else None,
+                "sample_size": len(recent),
+            }
+        return results
 
     def history(self, limit=100):
         with self.conn() as c:

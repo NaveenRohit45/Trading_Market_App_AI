@@ -10,6 +10,8 @@ from backend.analyzers.news_analyzer import NewsAnalyzer
 from backend.prediction.prediction_engine import predict, combined_verdict
 from backend.prediction.ml_predictor import predict_ml
 from backend.ai.ai_summary import generate_ai_summary
+from backend.prediction.adaptive_confidence import combine_adaptive_verdict
+from backend.prediction.regime_detector import detect_regime
 import httpx
 from backend.services.database import Database
 from backend.data.demo_provider import DemoProvider
@@ -349,6 +351,13 @@ class MarketService:
             prices,
         )
 
+        # Resolve each brain's individual calls too -- this is what
+        # feeds the Adaptive Confidence Engine's rolling accuracy.
+        self.db.resolve_brain_calls(
+            now,
+            prices,
+        )
+
 
         self.latest = self.build_live_snapshot(
             prices,
@@ -367,6 +376,25 @@ class MarketService:
             "brains",
             self.last_live_brains,
         )
+
+        # Persist closed 1-minute candles every cycle (cheap,
+        # INSERT OR IGNORE dedupes automatically) -- this is the raw
+        # data train_lstm.py needs. Doing this every tick is fine
+        # since duplicates are just ignored.
+        for candle_symbol in ("NIFTY", "SENSEX"):
+            closed_candles = self.engine.series(
+                candle_symbol, 60, include_current=False
+            )
+            for candle in closed_candles[-3:]:  # last few, cheap dedupe insert
+                self.db.add_candle(
+                    candle_symbol,
+                    candle.start_ts,
+                    candle.open,
+                    candle.high,
+                    candle.low,
+                    candle.close,
+                    candle.volume,
+                )
 
         if (
             now - self.last_prediction
@@ -410,6 +438,65 @@ class MarketService:
             f"NIFTY: {nifty_price} | "
             f"SENSEX: {sensex_price}"
         )
+
+
+    def compute_adaptive_verdict(self, symbol, analysis, price_action, forecasts, now, prices):
+        """
+        Gathers every brain's current vote for this symbol, normalizes
+        their direction vocabulary (price-action uses
+        BULLISH/BEARISH/NEUTRAL; forecasts use UP/DOWN/SIDEWAYS -- the
+        Adaptive Confidence Engine needs one consistent vocabulary),
+        logs each vote to brain_calls for future accuracy scoring, and
+        returns the reweighted verdict.
+        """
+
+        direction_map = {
+            "BULLISH": "UP", "BEARISH": "DOWN", "NEUTRAL": "SIDEWAYS",
+            "UP": "UP", "DOWN": "DOWN", "SIDEWAYS": "SIDEWAYS",
+        }
+
+        brain_votes = {}
+
+        pa = price_action.get(symbol) or {}
+        if pa.get("direction"):
+            brain_votes["price_action"] = {
+                "direction": direction_map.get(pa["direction"], "SIDEWAYS"),
+                "confidence": pa.get("confidence", 50.0),
+            }
+
+        v1_list = forecasts.get(symbol) or []
+        v1_three_min = next((f for f in v1_list if f.get("horizon") == 3), None)
+        if v1_three_min:
+            brain_votes["v1_heuristic"] = {
+                "direction": direction_map.get(v1_three_min.get("direction"), "SIDEWAYS"),
+                "confidence": v1_three_min.get("confidence", 50.0),
+            }
+
+        ml_list = forecasts.get(f"{symbol}_ML") or []
+        ml_three_min = next((f for f in ml_list if f.get("horizon") == 3), None)
+        if ml_three_min:
+            brain_votes["ml_model"] = {
+                "direction": direction_map.get(ml_three_min.get("direction"), "SIDEWAYS"),
+                "confidence": ml_three_min.get("confidence", 50.0),
+            }
+
+        current_regime = detect_regime(analysis)
+
+        # Log each brain's call for future accuracy resolution (cheap
+        # write, dedupe isn't needed since these are timestamped facts,
+        # not idempotent state).
+        price_now = prices.get(symbol)
+        if price_now:
+            for brain_name, vote in brain_votes.items():
+                self.db.add_brain_call(
+                    now, symbol, brain_name, 3, price_now,
+                    vote["direction"],
+                    regime=current_regime,
+                )
+
+        result = combine_adaptive_verdict(symbol, analysis, brain_votes, self.db)
+
+        return result
 
 
     async def refresh_ai_summaries(self, now):
@@ -808,9 +895,20 @@ class MarketService:
         )
         global_market = asdict(global_market)
 
+        # BUGFIX: LiveMarketAnalysis is a @dataclass, not a dict --
+        # json.dumps()/websocket.send_json() cannot serialize it
+        # directly. This was silently killing every websocket
+        # broadcast (caught in broadcast()'s except block, which then
+        # discarded the client), which is why the dashboard always
+        # showed "Clients: 0" after the very first failed send.
+        live_market_serializable = {
+            symbol: asdict(analysis)
+            for symbol, analysis in live_market.items()
+        }
+
         self.last_live_brains = {
             "price_action": price_action,
-            "live_market": live_market,
+            "live_market": live_market_serializable,
             "global_market": global_market,
             "decision": trade_decisions,
         }
@@ -873,6 +971,18 @@ class MarketService:
                 analyses["NIFTY"],
                 analyses["SENSEX"],
             ),
+
+            # Adaptive Confidence Engine -- reweights every brain by
+            # its OWN real recent accuracy + current regime, and logs
+            # each brain's call so that accuracy can be measured going
+            # forward. Additive: your existing "combined" verdict
+            # above is untouched.
+            "adaptive": {
+                symbol: self.compute_adaptive_verdict(
+                    symbol, analyses[symbol], price_action, forecasts, now, prices,
+                )
+                for symbol in ("NIFTY", "SENSEX")
+            },
 
             "news_score": news_score,
             "news": self.news.latest(),

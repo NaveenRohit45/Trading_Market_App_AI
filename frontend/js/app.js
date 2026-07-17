@@ -60,6 +60,36 @@ function renderAiSummary(d) {
 }
 
 
+function renderAdaptiveVerdict(d) {
+
+    const adaptive = d.adaptive || {};
+
+    for (const symbol of ['NIFTY', 'SENSEX']) {
+
+        const entry = adaptive[symbol];
+        const prefix = symbol.toLowerCase();
+
+        const regimeEl = $(`${prefix}Regime`);
+        const verdictEl = $(`${prefix}AdaptiveVerdict`);
+        const confEl = $(`${prefix}AdaptiveConfidence`);
+        const weightsEl = $(`${prefix}BrainWeights`);
+
+        if (!entry) continue;
+
+        if (regimeEl) regimeEl.textContent = entry.regime || '--';
+        if (verdictEl) verdictEl.textContent = entry.direction || '--';
+        if (confEl) confEl.textContent = entry.confidence != null ? `${entry.confidence}%` : '--';
+
+        if (weightsEl && entry.brain_weights) {
+            const lines = Object.entries(entry.brain_weights)
+                .map(([brain, w]) => `${brain}: ${(w * 100).toFixed(0)}%`)
+                .join(' \u00b7 ');
+            weightsEl.textContent = lines || 'No brain weights yet.';
+        }
+    }
+}
+
+
 function stateClass(s) {
 
     return s === 'BULLISH'
@@ -133,6 +163,7 @@ function renderFeedError(d) {
     // AI summary can still be shown even during a feed error --
     // it's on its own slower cadence and isn't tied to live ticks.
     renderAiSummary(d);
+    renderAdaptiveVerdict(d);
 
     // RESET PRICE ACTION PANEL
     renderPriceAction(d);
@@ -726,6 +757,7 @@ console.log(d);
     $('source').textContent = 'GROWW LIVE';
 
     renderAiSummary(d);
+    renderAdaptiveVerdict(d);
 
     for (
         const [key, id]
@@ -1007,16 +1039,31 @@ function connect() {
 
     ws.onmessage = e => {
 
-    const data = JSON.parse(e.data);
+    // NOTE: console.clear() removed deliberately -- it was wiping out
+    // real error messages before anyone could see them. If something
+    // throws inside render(), it will now show up clearly below.
 
-    console.clear();
-    console.log("========== LIVE WEBSOCKET ==========");
-    console.log(data.status);
-    console.log(data.live);
-    console.log(data.prices);
-    console.log(data.brains);
+    let data;
 
-    render(data);
+    try {
+        data = JSON.parse(e.data);
+    } catch (parseError) {
+        console.error("❌ WS MESSAGE WAS NOT VALID JSON:", parseError, e.data);
+        return;
+    }
+
+    console.log("========== LIVE WEBSOCKET MESSAGE RECEIVED ==========");
+    console.log("status:", data.status, "| live:", data.live);
+    console.log("prices:", data.prices);
+    console.log("full payload:", data);
+
+    try {
+        render(data);
+        console.log("✅ render() completed without error");
+    } catch (renderError) {
+        console.error("❌ render() THREW AN ERROR:", renderError);
+        console.error("Payload that caused it:", data);
+    }
 
 };
 
