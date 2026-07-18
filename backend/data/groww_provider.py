@@ -73,9 +73,15 @@ class GrowwProvider:
 
         from datetime import datetime, timedelta
 
+        # Per Groww's official docs (groww.in/trade-api/docs/curl/backtesting):
+        # "Groww symbol is formed by concatenating exchange and trading
+        # symbol. For Stocks and Indices: Only exchange and trading
+        # symbol are used." e.g. NSE-WIPRO, NOT bare "WIPRO".
+        # Passing the bare symbol was the actual cause of the earlier
+        # "Access forbidden" error, not a subscription/permission issue.
         symbol_map = {
-            "NIFTY": {"exchange": "NSE", "segment": "CASH", "groww_symbol": "NIFTY"},
-            "SENSEX": {"exchange": "BSE", "segment": "CASH", "groww_symbol": "SENSEX"},
+            "NIFTY": {"exchange": "NSE", "segment": "CASH", "groww_symbol": "NSE-NIFTY"},
+            "SENSEX": {"exchange": "BSE", "segment": "CASH", "groww_symbol": "BSE-SENSEX"},
         }
 
         if symbol not in symbol_map:
