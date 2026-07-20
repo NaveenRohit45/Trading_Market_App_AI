@@ -1,0 +1,14 @@
+# Replace with your real domain before deploying. Caddy will
+# automatically obtain and renew a free HTTPS certificate for it via
+# Let's Encrypt -- no manual certbot/nginx config needed.
+#
+# your-domain.com {
+#     reverse_proxy app:8000
+# }
+
+# For quick testing without a domain yet (plain HTTP on port 80,
+# reachable via your server's IP address). Switch to the domain block
+# above once you have DNS pointed at this server.
+:80 {
+    reverse_proxy app:8000
+}

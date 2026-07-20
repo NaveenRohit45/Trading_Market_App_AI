@@ -1,0 +1,29 @@
+[Unit]
+Description=ADA Market Intelligence
+After=network.target
+
+[Service]
+Type=simple
+# Adjust these two paths to match your actual deployment location:
+User=www-data
+WorkingDirectory=/opt/ada-market-intelligence
+EnvironmentFile=/opt/ada-market-intelligence/.env
+ExecStart=/opt/ada-market-intelligence/.venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+# --- Setup instructions ---
+# 1. Copy this file to /etc/systemd/system/ada-market.service
+# 2. Adjust User/WorkingDirectory/paths above to match your server
+# 3. sudo systemctl daemon-reload
+# 4. sudo systemctl enable ada-market
+# 5. sudo systemctl start ada-market
+# 6. Check logs: sudo journalctl -u ada-market -f
+#
+# NOTE: this binds to 127.0.0.1 only (not 0.0.0.0) -- pair this with
+# a reverse proxy (nginx or Caddy) in front of it for real deployment,
+# same reasoning as the Docker setup: never expose uvicorn directly
+# to the internet without HTTPS and a proxy in front.

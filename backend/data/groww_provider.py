@@ -11,26 +11,199 @@ from backend.models import Candle
 
 class GrowwProvider:
 
+    @staticmethod
+    def _get_access_token_with_full_diagnostics(api_key, secret):
+        """
+        Groww's SDK swallows its own error response and just raises a
+        generic "Bad Request" on 400, which makes real auth problems
+        (expired key, malformed .env value, wrong auth mode) very
+        hard to diagnose. This calls the same endpoint directly so we
+        can print Groww's ACTUAL error text before falling back to
+        the SDK's own (less informative) exception.
+        """
+
+        import requests
+
+        # Common .env authoring mistake: wrapping the value in quotes,
+        # e.g. GROWW_API_KEY="abc123" -- python-dotenv does NOT strip
+        # these, so the literal quote characters end up IN the key,
+        # silently breaking auth. Strip stray quotes/whitespace defensively.
+        clean_key = (api_key or "").strip().strip('"').strip("'")
+        clean_secret = (secret or "").strip().strip('"').strip("'")
+
+        if clean_key != api_key or clean_secret != secret:
+            print(
+                "⚠️  GROWW_API_KEY or GROWW_API_SECRET in .env had stray "
+                "quotes/whitespace -- stripped automatically, but fix "
+                "your .env file to avoid relying on this."
+            )
+
+        # Groww issues two DIFFERENT key types from their API
+        # dashboard: "approval" mode (send the secret directly) and
+        # "TOTP" mode (the secret is actually a TOTP seed -- you must
+        # generate a live rotating 6-digit code from it with each
+        # request, same as an authenticator app). Groww's error
+        # response tells us which one a given key expects
+        # ("totp value cannot be empty" = this key is TOTP-mode), so
+        # we try TOTP mode first since that's what regenerated keys
+        # commonly default to, and fall back to secret-mode.
+
+        def _try_auth(payload):
+            return requests.post(
+                "https://api.groww.in/v1/token/api/access",
+                headers={
+                    "Authorization": f"Bearer {clean_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=15,
+            )
+
+        try:
+            import pyotp
+        except ImportError:
+            print(
+                "⚠️  pyotp not installed -- run: pip install pyotp "
+                "--break-system-packages (or pip install -r requirements.txt). "
+                "Falling back to secret-mode auth for now, which will "
+                "fail if your key is TOTP-mode."
+            )
+            try:
+                response = _try_auth({"secret": clean_secret})
+            except Exception as network_error:
+                print(f"❌ Could not reach Groww's auth endpoint at all: {network_error}")
+                raise
+        else:
+            try:
+                # TOTP seeds are commonly DISPLAYED with spaces for
+                # readability (e.g. "ABCD EFGH IJKL") when Groww shows
+                # them to you -- but base32 decoding requires no
+                # whitespace. Also normalize case, since base32 is
+                # case-insensitive but some clipboards/fonts confuse
+                # lowercase L/1, O/0 when hand-typed.
+                totp_seed = clean_secret
+
+                # Auto-recover the common case: pasting the full
+                # "otpauth://..." URI (what a QR code actually
+                # encodes) instead of just the secret text. Extract
+                # the real secret parameter automatically.
+                if "otpauth://" in totp_seed or "secret=" in totp_seed:
+                    import re
+                    match = re.search(r"[?&]secret=([A-Za-z2-7]+)", totp_seed)
+                    if match:
+                        print(
+                            "⚠️  GROWW_API_SECRET looked like a full otpauth:// "
+                            "URI, not a bare secret -- extracted the secret "
+                            "parameter from it automatically."
+                        )
+                        totp_seed = match.group(1)
+
+                totp_seed = totp_seed.replace(" ", "").replace("-", "").upper()
+
+                # Print exactly what's wrong with the string, without
+                # needing to see the actual secret value -- length and
+                # which specific characters are invalid is enough to
+                # diagnose this without exposing the credential.
+                valid_base32_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567=")
+                invalid_chars = sorted(set(
+                    ch for ch in totp_seed if ch not in valid_base32_chars
+                ))
+
+                print("=" * 60)
+                print("TOTP SECRET DIAGNOSTIC (no credential values shown)")
+                print(f"Length: {len(totp_seed)} characters")
+                print(f"Invalid characters found: {invalid_chars if invalid_chars else 'none'}")
+                if invalid_chars:
+                    print(
+                        "Base32 only allows A-Z and 2-7. If you see 0, 1, "
+                        "8, or 9 above, or lowercase letters, or symbols "
+                        "like ':', '/', '_', '-' -- the value in "
+                        "GROWW_API_SECRET is NOT a plain base32 TOTP seed. "
+                        "This often happens if you copied a full "
+                        "'otpauth://...' URL or a QR-code payload instead "
+                        "of just the secret text Groww showed underneath it."
+                    )
+                print("=" * 60)
+
+                try:
+                    totp_code = pyotp.TOTP(totp_seed).now()
+                except Exception as decode_error:
+                    print("=" * 60)
+                    print(f"❌ GROWW_API_SECRET is not a valid TOTP seed: {decode_error}")
+                    print(
+                        "This should be the base32 TOTP secret Groww showed you "
+                        "when you generated this API key (NOT your Groww "
+                        "account password, NOT the API key itself, and NOT a "
+                        "6-digit code -- those all expire/rotate). If you're "
+                        "not sure you copied the right value, regenerate the "
+                        "key on Groww's API dashboard and copy the TOTP "
+                        "secret shown at that moment -- it's usually only "
+                        "shown once."
+                    )
+                    print("=" * 60)
+                    raise
+
+                response = _try_auth({"totp": totp_code})
+
+                if response.status_code == 400:
+                    print(
+                        "TOTP-mode auth failed, retrying with secret-mode "
+                        "in case this key is the older 'approval' type..."
+                    )
+                    response = _try_auth({"secret": clean_secret})
+
+            except Exception as network_error:
+                print(f"❌ Could not reach Groww's auth endpoint at all: {network_error}")
+                raise
+
+        if not response.ok:
+            print("=" * 60)
+            print(f"❌ GROWW AUTH FAILED -- HTTP {response.status_code}")
+            print(f"Raw response body: {response.text}")
+            print("=" * 60)
+            print(
+                "Common causes: (1) the API key/secret pair has "
+                "expired -- Groww's 'approval' mode keys are often "
+                "only valid ~24 hours and need regenerating daily on "
+                "the Groww API dashboard, (2) the key/secret were "
+                "copy-pasted with extra characters, (3) this key was "
+                "generated for TOTP mode, not secret/approval mode, "
+                "or vice versa."
+            )
+            response.raise_for_status()
+
+        return response.json()["token"]
+
+
     def __init__(self):
-
-        if not settings.groww_api_key:
-            raise RuntimeError(
-                "GROWW_API_KEY is missing from .env"
-            )
-
-        if not settings.groww_api_secret:
-            raise RuntimeError(
-                "GROWW_API_SECRET is missing from .env"
-            )
 
         print("=" * 60)
         print("CONNECTING TO GROWW")
         print("=" * 60)
 
-        access_token = GrowwAPI.get_access_token(
-            api_key=settings.groww_api_key,
-            secret=settings.groww_api_secret,
-        )
+        if settings.groww_access_token:
+            # Simplest, most reliable path: a long-lived token
+            # generated directly from Groww's dashboard. No TOTP, no
+            # secret exchange, no expiry surprises from this code's
+            # side. Use this if you have it.
+            print("Using GROWW_ACCESS_TOKEN directly (skipping TOTP/secret exchange).")
+            access_token = settings.groww_access_token.strip().strip('"').strip("'")
+
+        else:
+            if not settings.groww_api_key:
+                raise RuntimeError(
+                    "GROWW_API_KEY is missing from .env"
+                )
+
+            if not settings.groww_api_secret:
+                raise RuntimeError(
+                    "GROWW_API_SECRET is missing from .env"
+                )
+
+            access_token = self._get_access_token_with_full_diagnostics(
+                settings.groww_api_key,
+                settings.groww_api_secret,
+            )
 
         self.groww = GrowwAPI(access_token)
 

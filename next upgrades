@@ -239,3 +239,38 @@ Strategy Recommendation ⭐⭐⭐⭐⭐ (Highest Priority)
   Brain Voting
   Market Regime Learning
   Strategy Decay
+
+  Phase 2 (Feature Generator)---
+  Phase 3 (Learning Engine)---
+  if RSI > 60:
+    BUY
+
+    RSI + VWAP + Volume + PCR + OI + News + Gift ↓ 74% probability UP
+
+Phase 4 (Multi-model AI)--
+    XGBoost - LightGBM - CatBoost- LSTM - Transformer - Temporal Fusion Transformer - TabPFN - TimeGPT (optional)
+
+Phase 5 (Pattern Memory)---
+Instead of  RSI=42
+The AI remembers "I've seen this exact market." 17,000 times.
+
+Phase 6 (Reasoning AI)---
+Although momentum is bullish,
+heavy call writing exists at 24300.
+
+There is a 73% probability
+that price reaches 24260 before
+24300 is tested.
+
+Avoid buying above 24255 because
+risk/reward deteriorates.
+
+Phase 7 (Memory)---
+
+Phase 8 (Self Learning)
+Every night:  Market Closed
+
+AI automatically ↓ Collect today's data ↓ Train model ↓ Compare yesterday model ↓ If better Deploy Else Keep old model
+
+No human.
+

@@ -1,17 +1,21 @@
 import asyncio
 import time
 from collections import deque
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
+from enum import Enum
 
 from backend.config import settings
 from backend.core.candle_engine import CandleEngine
 from backend.analyzers.market_analyzer import analyze
 from backend.analyzers.news_analyzer import NewsAnalyzer
+from backend.models import NewsInput
 from backend.prediction.prediction_engine import predict, combined_verdict
 from backend.prediction.ml_predictor import predict_ml
 from backend.ai.ai_summary import generate_ai_summary
 from backend.prediction.adaptive_confidence import combine_adaptive_verdict
 from backend.prediction.regime_detector import detect_regime
+from backend.data.options_provider import OptionsFlowProvider
+from backend.data.news_ingestor import AutoNewsIngestor
 import httpx
 from backend.services.database import Database
 from backend.data.demo_provider import DemoProvider
@@ -94,6 +98,21 @@ class MarketService:
         self._ai_http_client = httpx.AsyncClient()
         self.ai_summaries = {}
         self.last_ai_summary_time = 0
+
+        # Options flow (PCR + OI shift) -- a genuinely new signal
+        # source, only available when we have a real Groww connection.
+        self.options_provider = (
+            OptionsFlowProvider(self.provider.groww)
+            if settings.app_mode == "GROWW" and hasattr(self.provider, "groww")
+            else None
+        )
+        self.options_analysis = {}
+        self.last_options_fetch_time = 0
+
+        self.news_ingestor = AutoNewsIngestor()
+        self.last_news_fetch_time = 0
+
+        self.last_regime = {}  # {symbol: regime} -- for change detection
 
     async def start(self):
 
@@ -407,6 +426,30 @@ class MarketService:
 
             self.last_prediction = now
 
+        # Automated news ingestion from free RSS feeds -- runs on
+        # the same slow cadence, fails safe if feeds are unreachable.
+        if now - self.last_news_fetch_time >= settings.prediction_interval_seconds:
+            self.last_news_fetch_time = now
+            try:
+                for item in self.news_ingestor.fetch_new_items():
+                    self.news.add(NewsInput(**item))
+            except Exception as error:
+                print(f"⚠️ Auto news ingestion failed: {error}")
+
+        # Options flow (PCR/OI) -- also slow cadence, real API cost.
+        if (
+            self.options_provider is not None
+            and now - self.last_options_fetch_time >= settings.prediction_interval_seconds
+        ):
+            self.last_options_fetch_time = now
+            for opt_symbol in ("NIFTY", "SENSEX"):
+                try:
+                    result = self.options_provider.analyze(opt_symbol)
+                    if result is not None:
+                        self.options_analysis[opt_symbol] = result
+                except Exception as error:
+                    print(f"⚠️ Options analysis failed for {opt_symbol}: {error}")
+
         # Real AI reasoning layer -- runs on the same slow cadence as
         # prediction storage (not every 3-second tick). Failures are
         # caught inside generate_ai_summary and never break the live
@@ -480,7 +523,31 @@ class MarketService:
                 "confidence": ml_three_min.get("confidence", 50.0),
             }
 
+        # Options flow (PCR + OI shift) -- genuinely new signal, votes
+        # like every other brain and earns/loses trust the same way.
+        options_data = self.options_analysis.get(symbol)
+        if options_data and options_data.get("direction"):
+            brain_votes["options_flow"] = {
+                "direction": direction_map.get(options_data["direction"], "SIDEWAYS"),
+                "confidence": options_data.get("confidence", 50.0),
+            }
+
         current_regime = detect_regime(analysis)
+
+        # Regime-change alert -- fires once per actual transition, not
+        # every cycle (that would spam the alerts feed uselessly).
+        previous_regime = self.last_regime.get(symbol)
+        if (
+            previous_regime is not None
+            and current_regime != previous_regime
+            and current_regime != "UNKNOWN"
+        ):
+            self.alerts.appendleft({
+                "ts": now,
+                "title": f"{symbol} regime change",
+                "message": f"Shifted from {previous_regime} to {current_regime}.",
+            })
+        self.last_regime[symbol] = current_regime
 
         # Log each brain's call for future accuracy resolution (cheap
         # write, dedupe isn't needed since these are timestamped facts,
@@ -893,7 +960,7 @@ class MarketService:
             crude_change=-1.10,
 
         )
-        global_market = asdict(global_market)
+        global_market = self.to_json(global_market)
 
         # BUGFIX: LiveMarketAnalysis is a @dataclass, not a dict --
         # json.dumps()/websocket.send_json() cannot serialize it
@@ -901,10 +968,7 @@ class MarketService:
         # broadcast (caught in broadcast()'s except block, which then
         # discarded the client), which is why the dashboard always
         # showed "Clients: 0" after the very first failed send.
-        live_market_serializable = {
-            symbol: asdict(analysis)
-            for symbol, analysis in live_market.items()
-        }
+        live_market_serializable = self.to_json(live_market)
 
         self.last_live_brains = {
             "price_action": price_action,
@@ -955,7 +1019,7 @@ class MarketService:
 
                 "price_action": price_action,
 
-                "live_market": live_market,
+                "live_market": live_market_serializable,
 
                 "global_market": global_market,
 
@@ -983,6 +1047,8 @@ class MarketService:
                 )
                 for symbol in ("NIFTY", "SENSEX")
             },
+
+            "options": self.options_analysis,
 
             "news_score": news_score,
             "news": self.news.latest(),
@@ -1142,6 +1208,33 @@ class MarketService:
 
         for websocket in dead_clients:
             self.clients.discard(websocket)
+
+    @staticmethod
+    def to_json(obj):
+        """
+        Convert dataclasses, Enums, dicts and lists into
+        JSON-serializable objects.
+        """
+
+        if is_dataclass(obj):
+            obj = asdict(obj)
+
+        if isinstance(obj, Enum):
+            return obj.value
+
+        if isinstance(obj, dict):
+            return {
+                k: MarketService.to_json(v)
+                for k, v in obj.items()
+            }
+
+        if isinstance(obj, (list, tuple)):
+            return [
+                MarketService.to_json(v)
+                for v in obj
+            ]
+
+        return obj
 
 
 service = MarketService()

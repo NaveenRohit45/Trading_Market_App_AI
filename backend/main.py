@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request, Form
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from backend.config import BASE_DIR, settings
 from backend.models import NewsInput
 from backend.services.market_service import service
+from backend.auth import AuthMiddleware, login_page, handle_login_submit
 
 @asynccontextmanager
 async def lifespan(app):
@@ -13,7 +14,16 @@ async def lifespan(app):
     await service.stop()
 
 app = FastAPI(title="ADA Market Intelligence", version="1.0.0", lifespan=lifespan)
+app.add_middleware(AuthMiddleware)
 app.mount("/static", StaticFiles(directory=BASE_DIR/"frontend"), name="static")
+
+@app.get("/login")
+def login_get(error: int = 0):
+    return login_page(error=bool(error))
+
+@app.post("/login")
+def login_post(password: str = Form(...)):
+    return handle_login_submit(password)
 
 @app.get("/")
 def home(): return FileResponse(BASE_DIR/"frontend"/"index.html")
@@ -38,6 +48,9 @@ def history(limit:int=100): return service.db.history(min(limit,1000))
 
 @app.get("/api/accuracy")
 def accuracy(): return service.db.accuracy()
+
+@app.get("/api/replay")
+def replay(symbol: str = "NIFTY", limit: int = 200): return service.db.replay_session(symbol, min(limit, 500))
 
 @app.post("/api/news")
 def add_news(item:NewsInput):

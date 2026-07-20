@@ -126,3 +126,24 @@ class Database:
         with self.conn() as c:
             rows = c.execute("SELECT symbol,horizon,COUNT(*),SUM(correct) FROM predictions WHERE resolved=1 GROUP BY symbol,horizon").fetchall()
         return [{"symbol":r[0],"horizon":r[1],"count":r[2],"accuracy":round(100*(r[3] or 0)/r[2],1)} for r in rows]
+
+    def replay_session(self, symbol, limit=200):
+        """
+        For Historical Replay: every resolved prediction for a symbol,
+        with what actually happened, ordered oldest-first so the
+        frontend can step through a session chronologically.
+        """
+        with self.conn() as c:
+            c.row_factory = sqlite3.Row
+            rows = c.execute(
+                """
+                SELECT ts, symbol, horizon, price, direction, confidence,
+                       features, actual_direction, correct
+                FROM predictions
+                WHERE symbol=? AND resolved=1
+                ORDER BY ts ASC
+                LIMIT ?
+                """,
+                (symbol, limit),
+            ).fetchall()
+        return [dict(r) for r in rows]

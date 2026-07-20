@@ -30,6 +30,22 @@ class Settings(BaseModel):
         ""
     )
 
+    # Simplest auth path: Groww's dashboard can generate a long-lived
+    # access token directly. If this is set, we skip the entire
+    # api_key + secret/TOTP token-exchange dance and use it as-is.
+    groww_access_token: str = os.getenv(
+        "GROWW_ACCESS_TOKEN",
+        ""
+    )
+
+    # Shared-password gate for multi-user deployment. Leave empty for
+    # local dev (auth disabled). Set before deploying anywhere
+    # reachable from outside your own machine.
+    dashboard_password: str = os.getenv(
+        "DASHBOARD_PASSWORD",
+        ""
+    )
+
     finnhub_api_key: str = os.getenv(
         "FINNHUB_API_KEY",
         ""
