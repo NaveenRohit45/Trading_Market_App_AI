@@ -1450,6 +1450,7 @@ function renderPredictionPage(d) {
     el.innerHTML = symbols.map(symbol => {
         const forecasts = (d.forecast && d.forecast[symbol]) || [];
         const adaptive = (d.adaptive && d.adaptive[symbol]) || null;
+        const pattern = (d.pattern_memory && d.pattern_memory[symbol]) || null;
 
         const forecastRows = forecasts.length
             ? forecasts.map(f => `
@@ -1477,6 +1478,15 @@ function renderPredictionPage(d) {
                     weights: ${Object.entries(adaptive.brain_weights || {}).map(([b, w]) => `${b} ${(w * 100).toFixed(0)}%`).join(', ') || 'none yet'}
                 </div>
             ` : ''}
+            ${pattern && pattern.historical_matches > 0 ? `
+                <div style="font-size:13px;color:var(--text-muted,#8a97a8);margin-top:6px">
+                    🧠 Pattern memory: seen this setup <b style="color:var(--text-primary,#eaf2ff)">${pattern.historical_matches}</b> times ·
+                    win rate <b style="color:var(--text-primary,#eaf2ff)">${(pattern.win_rate * 100).toFixed(0)}%</b>
+                    (${pattern.wins}W / ${pattern.losses}L) · recommendation: <b>${pattern.recommendation}</b>
+                </div>
+            ` : `
+                <div style="font-size:12px;color:var(--text-muted,#8a97a8);margin-top:6px">🧠 Pattern memory: no historical matches for this exact setup yet.</div>
+            `}
         `;
     }).join('<hr style="border-color:#1b2a3c;margin:20px 0">');
 }

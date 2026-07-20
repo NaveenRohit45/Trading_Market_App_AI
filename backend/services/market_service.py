@@ -1,8 +1,7 @@
 import asyncio
 import time
 from collections import deque
-from dataclasses import asdict, is_dataclass
-from enum import Enum
+from dataclasses import asdict
 
 from backend.config import settings
 from backend.core.candle_engine import CandleEngine
@@ -16,6 +15,9 @@ from backend.prediction.adaptive_confidence import combine_adaptive_verdict
 from backend.prediction.regime_detector import detect_regime
 from backend.data.options_provider import OptionsFlowProvider
 from backend.data.news_ingestor import AutoNewsIngestor
+from backend.brains.learning.learning_brain import LearningBrain
+from backend.brains.learning.pattern_memory import PatternMemory
+from backend.brains.learning.models import PredictionRecord
 import httpx
 from backend.services.database import Database
 from backend.data.demo_provider import DemoProvider
@@ -113,6 +115,15 @@ class MarketService:
         self.last_news_fetch_time = 0
 
         self.last_regime = {}  # {symbol: regime} -- for change detection
+
+        # Pattern Memory / Learning Brain (Phase 5 + 7) -- previously
+        # built but never wired in. Shares one storage backend so
+        # recorded predictions actually build a searchable pattern
+        # index over time.
+        self.learning_brain = LearningBrain()
+        self.pattern_memory = PatternMemory(self.learning_brain.storage)
+        self.pattern_analysis = {}       # {symbol: PatternAnalysis}
+        self.pending_pattern_predictions = []  # [(resolve_ts, symbol, PredictionRecord)]
 
     async def start(self):
 
@@ -376,6 +387,8 @@ class MarketService:
             now,
             prices,
         )
+
+        self._resolve_pending_pattern_predictions(now, prices)
 
 
         self.latest = self.build_live_snapshot(
@@ -960,7 +973,7 @@ class MarketService:
             crude_change=-1.10,
 
         )
-        global_market = self.to_json(global_market)
+        global_market = asdict(global_market)
 
         # BUGFIX: LiveMarketAnalysis is a @dataclass, not a dict --
         # json.dumps()/websocket.send_json() cannot serialize it
@@ -968,7 +981,10 @@ class MarketService:
         # broadcast (caught in broadcast()'s except block, which then
         # discarded the client), which is why the dashboard always
         # showed "Clients: 0" after the very first failed send.
-        live_market_serializable = self.to_json(live_market)
+        live_market_serializable = {
+            symbol: asdict(analysis)
+            for symbol, analysis in live_market.items()
+        }
 
         self.last_live_brains = {
             "price_action": price_action,
@@ -1050,6 +1066,14 @@ class MarketService:
 
             "options": self.options_analysis,
 
+            # Learned from the earlier LiveMarketAnalysis bug --
+            # PatternAnalysis is also a dataclass, must be converted
+            # before it can be JSON-serialized over the websocket.
+            "pattern_memory": {
+                symbol: asdict(pa)
+                for symbol, pa in self.pattern_analysis.items()
+            },
+
             "news_score": news_score,
             "news": self.news.latest(),
 
@@ -1128,6 +1152,94 @@ class MarketService:
                     prediction,
                     features=feature_snapshot,
                 )
+
+            # Pattern Memory (Phase 5/7) -- only for real index
+            # symbols, not "_ML" forecast variants.
+            if not symbol.endswith("_ML"):
+                self._record_pattern_memory(
+                    symbol, now, symbol_analysis, predictions,
+                )
+
+
+    def _record_pattern_memory(self, symbol, now, symbol_analysis, predictions):
+        """
+        Builds a PredictionRecord from the current snapshot, asks
+        PatternMemory whether it has "seen this exact market setup"
+        before (and with what real outcome), stores the result for
+        the frontend/AI-reasoning layer, and records the prediction
+        itself so the pattern index keeps growing. A matching
+        resolution is scheduled for later (see
+        _resolve_pending_pattern_predictions), same horizon logic as
+        the rest of the system.
+        """
+
+        three_min = next((p for p in predictions if p.get("horizon") == 3), None)
+        if not three_min:
+            return
+
+        price_action = self.latest.get("brains", {}).get("price_action", {}).get(symbol, {})
+        options_data = self.options_analysis.get(symbol, {})
+
+        try:
+            record = PredictionRecord(
+                symbol=symbol,
+                timeframe="3m",
+                current_price=self.latest["prices"].get(symbol, 0.0),
+                decision=three_min.get("direction", "HOLD"),
+                confidence=three_min.get("confidence", 0.0),
+                price_action_signal=price_action.get("direction", "NEUTRAL"),
+                options_signal=options_data.get("oi_shift_bias", "NEUTRAL"),
+                support=symbol_analysis.get("support") or 0.0,
+                resistance=symbol_analysis.get("resistance") or 0.0,
+                atr=symbol_analysis.get("atr") or 0.0,
+                trend=symbol_analysis.get("regime", "SIDEWAYS"),
+            )
+
+            pattern_result = self.pattern_memory.analyze(record)
+            self.pattern_analysis[symbol] = pattern_result
+
+            prediction_id = self.learning_brain.record_prediction(record)
+
+            # Schedule resolution ~3 minutes out, same horizon as the
+            # forecast this record was built from.
+            self.pending_pattern_predictions.append(
+                (now + 3 * 60, symbol, record, prediction_id)
+            )
+
+        except Exception as error:
+            print(f"⚠️ Pattern memory recording failed for {symbol}: {error}")
+
+
+    def _resolve_pending_pattern_predictions(self, now, prices):
+        """
+        Completes the loop Phase 5/7 needs: once a prediction's
+        horizon has actually elapsed, record what really happened so
+        future pattern lookups have real win/loss history to learn
+        from, not just an ever-growing list of unresolved guesses.
+        """
+
+        still_pending = []
+
+        for resolve_ts, symbol, record, prediction_id in self.pending_pattern_predictions:
+
+            if now < resolve_ts:
+                still_pending.append((resolve_ts, symbol, record, prediction_id))
+                continue
+
+            exit_price = prices.get(symbol)
+            if exit_price is None:
+                continue
+
+            try:
+                self.learning_brain.record_outcome(
+                    prediction=record,
+                    exit_price=exit_price,
+                    exit_reason="horizon_reached",
+                )
+            except Exception as error:
+                print(f"⚠️ Pattern memory outcome resolution failed for {symbol}: {error}")
+
+        self.pending_pattern_predictions = still_pending
 
 
     def detect_alert(
@@ -1208,33 +1320,6 @@ class MarketService:
 
         for websocket in dead_clients:
             self.clients.discard(websocket)
-
-    @staticmethod
-    def to_json(obj):
-        """
-        Convert dataclasses, Enums, dicts and lists into
-        JSON-serializable objects.
-        """
-
-        if is_dataclass(obj):
-            obj = asdict(obj)
-
-        if isinstance(obj, Enum):
-            return obj.value
-
-        if isinstance(obj, dict):
-            return {
-                k: MarketService.to_json(v)
-                for k, v in obj.items()
-            }
-
-        if isinstance(obj, (list, tuple)):
-            return [
-                MarketService.to_json(v)
-                for v in obj
-            ]
-
-        return obj
 
 
 service = MarketService()

@@ -13,3 +13,6 @@ gymnasium>=0.29
 pyotp>=2.9
 feedparser>=6.0
 python-multipart>=0.0.9
+xgboost>=2.0
+lightgbm>=4.3
+catboost>=1.2

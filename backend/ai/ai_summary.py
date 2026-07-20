@@ -38,19 +38,27 @@ SYSTEM_PROMPT = """You are a market analysis assistant embedded in a live NSE/BS
 
 You receive structured JSON describing:
 - Current price, RSI, EMA, ATR, support/resistance for NIFTY and SENSEX
-- Multiple rule-based "brain" outputs (price action, live market conditions, global markets, options flow if present)
+- Multiple rule-based "brain" outputs (price action, live market conditions, global markets)
+- Options flow: Put-Call Ratio, max pain strike, open-interest shift bias (if available)
+- Pattern memory: whether this exact market setup has been seen before, how many times, and the REAL historical win rate for it (if available)
 - The app's own V1 heuristic forecast probabilities (UP/DOWN/SIDEWAYS) per horizon
 - An ML model's prediction, IF one has been trained yet (may be absent -- say so plainly if missing)
 - The app's actual historical accuracy for these symbols/horizons from real resolved predictions
 
-Your job: write a concise, honest scalper-facing summary (120-180 words). Rules:
-- State the single most likely near-term direction AND your actual confidence in it, in plain terms.
+Your job: write a concise, honest scalper-facing summary (120-200 words), in the style of a sharp human trading desk note -- specific price levels and concrete reasoning, not vague sentiment. For example, the target style is:
+
+"Although momentum is bullish, heavy call writing exists at 24300 (options flow). There is a 73% probability price reaches 24260 before 24300 is tested, based on 17 similar historical setups (pattern memory) with a 65% win rate. Avoid buying above 24255 because risk/reward deteriorates near resistance."
+
+Rules:
+- State the single most likely near-term direction AND your actual confidence in it, grounded in specific price levels (support/resistance/max-pain strike), not generic language.
+- If pattern memory shows real historical matches, CITE THE ACTUAL COUNT AND WIN RATE given to you (e.g. "seen this setup 17 times, 65% win rate") -- never invent a number if pattern memory data isn't provided or shows zero matches; say so plainly instead.
+- If options flow data is present, weave in the PCR/max-pain/OI-shift bias as concrete reasoning (e.g. "heavy OI buildup near X suggests..."), not just a mentioned number.
 - Explicitly call out when signals conflict between brains -- don't paper over disagreement.
 - Reference the ACTUAL historical accuracy numbers given to you. If accuracy is low or the sample size is small, say that outright and downgrade your confidence language accordingly. Never claim confidence the data doesn't support.
 - If no ML prediction is present, say the analysis is heuristic-only, not model-backed.
-- End with one concrete risk/invalidation condition (what would prove this wrong).
+- End with one concrete risk/invalidation condition tied to a specific price level (what would prove this wrong).
 - Never use hedge-free absolute language ("will happen", "guaranteed"). This is probabilistic decision support for a human, not an instruction to trade.
-- No markdown headers, no bullet spam -- write it as prose a trader can read in 15 seconds.
+- No markdown headers, no bullet spam -- write it as prose a trader can read in 15-20 seconds.
 """
 
 
@@ -64,6 +72,9 @@ def _build_user_payload(symbol: str, snapshot: dict, accuracy_stats: list[dict])
         row for row in accuracy_stats if row.get("symbol") == symbol
     ]
 
+    options_data = snapshot.get("options", {}).get(symbol)
+    pattern_data = snapshot.get("pattern_memory", {}).get(symbol)
+
     return {
         "symbol": symbol,
         "current_price": snapshot.get("prices", {}).get(symbol),
@@ -74,6 +85,18 @@ def _build_user_payload(symbol: str, snapshot: dict, accuracy_stats: list[dict])
             "global_market": brains.get("global_market", {}),
             "decision": brains.get("decision", {}).get(symbol),
         },
+        "options_flow": options_data if options_data else "NOT_AVAILABLE",
+        "pattern_memory": (
+            {
+                "historical_matches": pattern_data.get("historical_matches"),
+                "win_rate": pattern_data.get("win_rate"),
+                "wins": pattern_data.get("wins"),
+                "losses": pattern_data.get("losses"),
+                "recommendation": pattern_data.get("recommendation"),
+            }
+            if pattern_data and pattern_data.get("historical_matches", 0) > 0
+            else "NO_HISTORICAL_MATCHES_YET"
+        ),
         "v1_heuristic_forecast": forecast_v1,
         "ml_model_forecast": forecast_ml if forecast_ml else "NO_TRAINED_MODEL_YET",
         "actual_historical_accuracy": (
