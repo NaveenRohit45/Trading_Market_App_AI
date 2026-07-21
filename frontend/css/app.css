@@ -46,3 +46,22 @@ nav a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .toast{background:var(--card-bg);border:1px solid var(--border-strong);border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text-primary);box-shadow:0 4px 16px rgba(0,0,0,.3);animation:toast-in .2s ease-out}
 .toast b{display:block;margin-bottom:3px;color:var(--accent)}
 @keyframes toast-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+.chart-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tf-buttons{display:flex;gap:4px;flex-wrap:wrap}
+.tf-btn{background:var(--bg-alt);border:1px solid var(--border);color:var(--text-muted);font-size:11px;padding:4px 9px;border-radius:5px;cursor:pointer;transition:all .15s}
+.tf-btn:hover{border-color:var(--accent)}
+.tf-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+#chartSymbol{background:var(--bg-alt);border:1px solid var(--border);color:var(--text-primary);border-radius:5px;padding:4px 8px;font-size:12px}
+
+.grid.two-col{grid-template-columns:1fr 1fr}
+.card{box-shadow:0 1px 3px rgba(0,0,0,.15);transition:border-color .15s}
+.grid{margin-top:16px}
+.card h3{letter-spacing:.2px}
+@media(max-width:1100px){.grid.two-col{grid-template-columns:1fr}}
+
+.pattern-badge{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.pattern-chip{font-size:11px;padding:4px 9px;border-radius:12px;border:1px solid;font-weight:600}
+.pattern-chip.bullish{color:#31df95;border-color:#1c5c42;background:rgba(49,223,149,.08)}
+.pattern-chip.bearish{color:#ff4f5f;border-color:#5c1c22;background:rgba(255,79,95,.08)}
+.pattern-chip.neutral{color:var(--text-muted);border-color:var(--border-strong);background:rgba(138,151,168,.06)}

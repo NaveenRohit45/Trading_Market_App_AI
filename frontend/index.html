@@ -18,7 +18,7 @@
 <div class="card index"><h3>SENSEX</h3><div class="price skeleton" id="sensexPrice">Loading</div><div class="state skeleton" id="sensexState">Loading</div><div class="mini"><span>Support <b id="sensexSupport">--</b></span><span>Resistance <b id="sensexResistance">--</b></span></div></div>
 <div class="card prediction"><h3>AI PREDICTION SUMMARY <em>EXPERIMENTAL</em></h3><table><thead><tr><th>Time</th><th>UP</th><th>DOWN</th><th>SIDEWAYS</th><th>Confidence</th></tr></thead><tbody id="predRows"></tbody></table><div class="verdict">AI VERDICT: <b id="verdict">NO-TRADE</b><span id="confirm">MIXED</span></div></div>
 </section>
-<section class="grid top">
+<section class="grid two-col">
 <div class="card adaptive-card">
     <h3>⚖️ ADAPTIVE CONFIDENCE ENGINE <em>NIFTY</em></h3>
     <div class="mini"><span>Regime <b id="niftyRegime">--</b></span></div>
@@ -55,7 +55,21 @@
 </div>
 </section>
 <section class="grid middle">
-<div class="card chart"><div class="cardhead"><h3>NIFTY 50 — LIVE TRACE</h3><span>1m engine</span></div><canvas id="chart"></canvas><div class="warning">V1 probabilities are heuristic shadow forecasts. Validate accuracy before trusting them.</div></div>
+<div class="card chart">
+<div class="cardhead">
+    <h3 id="chartTitle">NIFTY 50 — CANDLES</h3>
+    <div class="chart-controls">
+        <select id="chartSymbol" onchange="loadCandleChart()" aria-label="Chart symbol">
+            <option value="NIFTY">NIFTY 50</option>
+            <option value="SENSEX">SENSEX</option>
+        </select>
+        <div id="chartTimeframes" class="tf-buttons"></div>
+    </div>
+</div>
+<canvas id="chart"></canvas>
+<div id="patternBadge" class="pattern-badge"></div>
+<div class="warning">V1 probabilities are heuristic shadow forecasts. Validate accuracy before trusting them.</div>
+</div>
 <div class="card analysis"><h3>MARKET ANALYSIS</h3><div id="analysisRows"></div></div>
 <div class="card news"><h3>NEWS & SENTIMENT</h3><div class="newsScore">Current score <b id="newsScore">0.000</b></div><form id="newsForm" novalidate><input id="headline" placeholder="Add breaking headline for analysis" maxlength="200" required aria-label="Breaking headline"><select id="sentiment" aria-label="Sentiment"><option>neutral</option><option>positive</option><option>negative</option></select><button type="submit">Add</button></form><div id="newsFormError" style="color:#ff4f5f;font-size:12px;margin-top:6px;display:none" role="alert"></div><div id="newsList"></div></div>
 </section>
@@ -245,7 +259,16 @@
             </p>
             <table style="width:100%;font-size:13px">
                 <tr><td style="padding:8px 0;color:var(--text-muted)">App mode</td><td id="settingsMode">--</td></tr>
-                <tr><td style="padding:8px 0;color:var(--text-muted)">Prediction cycle</td><td>3 minutes</td></tr>
+                <tr><td style="padding:8px 0;color:var(--text-muted)">Prediction cycle</td><td>
+                    <select id="predictionCycleSelect" onchange="updatePredictionCycle()" aria-label="Prediction cycle">
+                        <option value="60">1 minute</option>
+                        <option value="180" selected>3 minutes</option>
+                        <option value="300">5 minutes</option>
+                        <option value="600">10 minutes</option>
+                        <option value="900">15 minutes</option>
+                    </select>
+                    <span id="predictionCycleStatus" style="font-size:12px;color:var(--text-muted);margin-left:8px"></span>
+                </td></tr>
                 <tr><td style="padding:8px 0;color:var(--text-muted)">Live refresh</td><td>3 seconds</td></tr>
                 <tr><td style="padding:8px 0;color:var(--text-muted)">Real AI analysis (Claude)</td><td id="settingsAiStatus">--</td></tr>
             </table>

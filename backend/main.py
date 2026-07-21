@@ -52,6 +52,28 @@ def accuracy(): return service.db.accuracy()
 @app.get("/api/replay")
 def replay(symbol: str = "NIFTY", limit: int = 200): return service.db.replay_session(symbol, min(limit, 500))
 
+@app.get("/api/candles")
+def candles(symbol: str = "NIFTY", interval: int = 60, limit: int = 200):
+    VALID_INTERVALS = {60, 120, 180, 300, 600, 1800, 3600, 86400}
+    if interval not in VALID_INTERVALS:
+        return {"error": f"interval must be one of {sorted(VALID_INTERVALS)}"}
+    raw = service.engine.series(symbol, interval, include_current=True)
+    trimmed = raw[-min(limit, 1000):]
+    return [
+        {"ts": c.start_ts, "open": c.open, "high": c.high, "low": c.low, "close": c.close, "volume": c.volume}
+        for c in trimmed
+    ]
+
+@app.post("/api/settings/prediction-cycle")
+def set_prediction_cycle(seconds: int):
+    # Runtime-adjustable prediction cadence -- the live loop reads
+    # settings.prediction_interval_seconds fresh every cycle, so this
+    # takes effect on the very next cycle, no restart needed.
+    if seconds < 30 or seconds > 3600:
+        return {"ok": False, "error": "seconds must be between 30 and 3600"}
+    settings.prediction_interval_seconds = seconds
+    return {"ok": True, "prediction_interval_seconds": seconds}
+
 @app.post("/api/news")
 def add_news(item:NewsInput):
     service.news.add(item)

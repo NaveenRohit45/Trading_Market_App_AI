@@ -861,6 +861,7 @@ console.log(d);
     safeRender('renderAiSummary', () => renderAiSummary(d));
     safeRender('renderAdaptiveVerdict', () => renderAdaptiveVerdict(d));
     safeRender('renderAlertToasts', () => renderAlertToasts(d));
+    safeRender('renderPatternBadge', () => renderPatternBadge(d));
 
     for (
         const [key, id]
@@ -1016,94 +1017,9 @@ console.log(d);
     `;
 
 
-    trace.push(
-        a.price
-    );
-
-    if (
-        trace.length > 120
-    ) {
-        trace.shift();
-    }
-
-    draw();
-}
-
-
-function draw() {
-
-    const c = $('chart');
-
-    const r =
-        devicePixelRatio || 1;
-
-    const w =
-        c.clientWidth;
-
-    const h =
-        c.clientHeight;
-
-    c.width = w * r;
-    c.height = h * r;
-
-    const x =
-        c.getContext('2d');
-
-    x.scale(r, r);
-
-    x.clearRect(
-        0,
-        0,
-        w,
-        h
-    );
-
-    if (
-        trace.length < 2
-    ) {
-        return;
-    }
-
-    let lo =
-        Math.min(...trace);
-
-    let hi =
-        Math.max(...trace);
-
-    let pad =
-        (hi - lo || 1) * .15;
-
-    lo -= pad;
-    hi += pad;
-
-    x.strokeStyle =
-        '#32d6a0';
-
-    x.lineWidth = 2;
-
-    x.beginPath();
-
-    trace.forEach(
-        (v, i) => {
-
-            let px =
-                i /
-                (trace.length - 1)
-                * w;
-
-            let py =
-                h -
-                (v - lo) /
-                (hi - lo)
-                * h;
-
-            i
-                ? x.lineTo(px, py)
-                : x.moveTo(px, py);
-        }
-    );
-
-    x.stroke();
+    // Old flat line-trace + draw() removed -- replaced by real
+    // OHLC candlestick rendering (drawCandles(), further below),
+    // fetched from /api/candles on its own refresh cycle.
 }
 
 
@@ -1311,7 +1227,8 @@ setInterval(
 );
 
 
-window.onresize = draw;
+// (window.onresize = draw; removed -- draw() will be replaced below
+// by drawCandles(), which registers its own resize handler.)
 
 
 connect();
@@ -1705,3 +1622,229 @@ function renderReplayFrame() {
         ${renderKeyValueTable(features)}
     `;
 }
+
+
+// --------------------------------------------------
+// CANDLESTICK CHART
+// --------------------------------------------------
+
+const TIMEFRAMES = [
+    { label: '1m', seconds: 60 },
+    { label: '2m', seconds: 120 },
+    { label: '3m', seconds: 180 },
+    { label: '5m', seconds: 300 },
+    { label: '10m', seconds: 600 },
+    { label: '30m', seconds: 1800 },
+    { label: '1H', seconds: 3600 },
+    { label: '1D', seconds: 86400 },
+];
+
+window.__chartState = {
+    symbol: 'NIFTY',
+    interval: 60,
+    candles: [],
+    refreshTimer: null,
+};
+
+function initChartTimeframeButtons() {
+    const container = $('chartTimeframes');
+    if (!container) return;
+
+    container.innerHTML = TIMEFRAMES.map(tf => `
+        <button type="button" class="tf-btn${tf.seconds === window.__chartState.interval ? ' active' : ''}"
+                data-seconds="${tf.seconds}" onclick="selectTimeframe(${tf.seconds})">${tf.label}</button>
+    `).join('');
+}
+
+function selectTimeframe(seconds) {
+    window.__chartState.interval = seconds;
+
+    document.querySelectorAll('.tf-btn').forEach(btn => {
+        btn.classList.toggle('active', Number(btn.dataset.seconds) === seconds);
+    });
+
+    loadCandleChart();
+}
+
+async function loadCandleChart() {
+    const symbolSelect = $('chartSymbol');
+    const symbol = symbolSelect ? symbolSelect.value : window.__chartState.symbol;
+    window.__chartState.symbol = symbol;
+
+    const titleEl = $('chartTitle');
+    if (titleEl) {
+        const tf = TIMEFRAMES.find(t => t.seconds === window.__chartState.interval);
+        titleEl.textContent = `${symbol === 'NIFTY' ? 'NIFTY 50' : symbol} — ${tf ? tf.label : ''} CANDLES`;
+    }
+
+    try {
+        const data = await fetch(
+            `/api/candles?symbol=${symbol}&interval=${window.__chartState.interval}&limit=150`
+        ).then(r => r.json());
+
+        if (Array.isArray(data)) {
+            window.__chartState.candles = data;
+            drawCandles();
+        }
+    } catch (error) {
+        console.error('Failed to load candle chart:', error);
+    }
+
+    if (window.__lastSnapshot) {
+        safeRender('renderPatternBadge', () => renderPatternBadge(window.__lastSnapshot));
+    }
+}
+
+function drawCandles() {
+    const canvas = $('chart');
+    if (!canvas) return;
+
+    const candles = window.__chartState.candles;
+
+    const ratio = devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+
+    canvas.width = w * ratio;
+    canvas.height = h * ratio;
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(ratio, ratio);
+    ctx.clearRect(0, 0, w, h);
+
+    if (!candles.length) {
+        ctx.fillStyle = 'rgba(138,151,168,0.6)';
+        ctx.font = '13px system-ui';
+        ctx.fillText('No candle data yet for this timeframe.', 12, 24);
+        return;
+    }
+
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+    let hi = Math.max(...highs);
+    let lo = Math.min(...lows);
+    const pad = (hi - lo || 1) * 0.08;
+    hi += pad;
+    lo -= pad;
+
+    const leftMargin = 55;
+    const plotWidth = w - leftMargin;
+    const candleSlot = plotWidth / candles.length;
+    const bodyWidth = Math.max(2, Math.min(14, candleSlot * 0.6));
+
+    const priceToY = price => h - ((price - lo) / (hi - lo)) * h;
+
+    ctx.strokeStyle = 'rgba(138,151,168,0.12)';
+    ctx.fillStyle = 'rgba(138,151,168,0.7)';
+    ctx.font = '10px system-ui';
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i <= 4; i++) {
+        const price = lo + ((hi - lo) * i) / 4;
+        const y = priceToY(price);
+        ctx.beginPath();
+        ctx.moveTo(leftMargin, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+        ctx.fillText(fmt(price), 2, y - 2);
+    }
+
+    candles.forEach((candle, i) => {
+        const cx = leftMargin + candleSlot * i + candleSlot / 2;
+        const isUp = candle.close >= candle.open;
+        const color = isUp ? '#31df95' : '#ff4f5f';
+
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        ctx.moveTo(cx, priceToY(candle.high));
+        ctx.lineTo(cx, priceToY(candle.low));
+        ctx.stroke();
+
+        const yOpen = priceToY(candle.open);
+        const yClose = priceToY(candle.close);
+        const bodyTop = Math.min(yOpen, yClose);
+        const bodyHeight = Math.max(1, Math.abs(yClose - yOpen));
+
+        ctx.fillRect(cx - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+    });
+}
+
+function startChartAutoRefresh() {
+    if (window.__chartState.refreshTimer) {
+        clearInterval(window.__chartState.refreshTimer);
+    }
+    window.__chartState.refreshTimer = setInterval(loadCandleChart, 5000);
+}
+
+window.addEventListener('resize', () => drawCandles());
+
+
+// --------------------------------------------------
+// CANDLESTICK PATTERN BADGES
+// --------------------------------------------------
+
+function renderPatternBadge(d) {
+    const el = $('patternBadge');
+    if (!el || !d) return;
+
+    const symbol = window.__chartState ? window.__chartState.symbol : 'NIFTY';
+    const data = (d.candlestick_patterns && d.candlestick_patterns[symbol]) || null;
+    const patterns = (data && data.patterns) || [];
+
+    if (!patterns.length) {
+        el.innerHTML = '<span style="font-size:11px;color:var(--text-muted)">No candlestick pattern detected right now.</span>';
+        return;
+    }
+
+    el.innerHTML = patterns.map(p => {
+        const cls = p.bias === 'BULLISH' ? 'bullish' : p.bias === 'BEARISH' ? 'bearish' : 'neutral';
+        return `<span class="pattern-chip ${cls}">${p.name} \u00b7 ${Math.round(p.strength)}%</span>`;
+    }).join('');
+}
+
+
+// --------------------------------------------------
+// PREDICTION CYCLE (runtime-adjustable)
+// --------------------------------------------------
+
+async function updatePredictionCycle() {
+    const select = $('predictionCycleSelect');
+    const status = $('predictionCycleStatus');
+    if (!select) return;
+
+    const seconds = Number(select.value);
+
+    if (status) status.textContent = 'Updating...';
+
+    try {
+        const response = await fetch(`/api/settings/prediction-cycle?seconds=${seconds}`, { method: 'POST' });
+        const result = await response.json();
+
+        if (result.ok) {
+            if (status) status.textContent = 'Updated \u2713';
+            const pill = document.querySelector('.pill');
+            if (pill) pill.textContent = `Prediction cycle: ${seconds >= 60 ? (seconds / 60) + 'm' : seconds + 's'}`;
+        } else {
+            if (status) status.textContent = result.error || 'Failed to update';
+        }
+    } catch (error) {
+        if (status) status.textContent = 'Failed to reach server';
+        console.error('Failed to update prediction cycle:', error);
+    }
+
+    setTimeout(() => { if (status) status.textContent = ''; }, 3000);
+}
+
+
+// --------------------------------------------------
+// INITIALIZE CHART + PATTERN BADGES ON LOAD, AND WIRE
+// THEM INTO THE LIVE RENDER PIPELINE
+// --------------------------------------------------
+
+initChartTimeframeButtons();
+loadCandleChart();
+startChartAutoRefresh();
+

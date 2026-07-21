@@ -1,7 +1,8 @@
 import asyncio
 import time
 from collections import deque
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
+from enum import Enum
 
 from backend.config import settings
 from backend.core.candle_engine import CandleEngine
@@ -13,6 +14,7 @@ from backend.prediction.ml_predictor import predict_ml
 from backend.ai.ai_summary import generate_ai_summary
 from backend.prediction.adaptive_confidence import combine_adaptive_verdict
 from backend.prediction.regime_detector import detect_regime
+from backend.analyzers.candlestick_patterns import detect_patterns, summarize_bias
 from backend.data.options_provider import OptionsFlowProvider
 from backend.data.news_ingestor import AutoNewsIngestor
 from backend.brains.learning.learning_brain import LearningBrain
@@ -124,6 +126,8 @@ class MarketService:
         self.pattern_memory = PatternMemory(self.learning_brain.storage)
         self.pattern_analysis = {}       # {symbol: PatternAnalysis}
         self.pending_pattern_predictions = []  # [(resolve_ts, symbol, PredictionRecord)]
+
+        self.candlestick_patterns = {}   # {symbol: {"direction","confidence","patterns"}}
 
     async def start(self):
 
@@ -362,10 +366,14 @@ class MarketService:
 
             # BUILD REAL MULTI-TIMEFRAME CANDLES
             for interval in (
-                    60,  # 1 minute
-                    120,  # 2 minutes
-                    180,  # 3 minutes
-                    300,  # 5 minutes
+                    60,     # 1 minute
+                    120,    # 2 minutes
+                    180,    # 3 minutes
+                    300,    # 5 minutes
+                    600,    # 10 minutes
+                    1800,   # 30 minutes
+                    3600,   # 1 hour
+                    86400,  # 1 day
             ):
                 self.engine.add_tick(
                     symbol,
@@ -543,6 +551,14 @@ class MarketService:
             brain_votes["options_flow"] = {
                 "direction": direction_map.get(options_data["direction"], "SIDEWAYS"),
                 "confidence": options_data.get("confidence", 50.0),
+            }
+
+        # Candlestick patterns -- another real vote, same treatment.
+        pattern_data = self.candlestick_patterns.get(symbol)
+        if pattern_data and pattern_data.get("direction"):
+            brain_votes["candlestick_patterns"] = {
+                "direction": pattern_data["direction"],
+                "confidence": pattern_data.get("confidence", 50.0),
             }
 
         current_regime = detect_regime(analysis)
@@ -819,6 +835,21 @@ class MarketService:
                 "SENSEX",
             )
         }
+
+        # Candlestick pattern detection -- runs on 5m candles (per
+        # the classic "balanced trading, moderate volatility" use
+        # case), voted into the Adaptive Confidence Engine like every
+        # other brain, and cited by name in the Real AI reasoning
+        # layer.
+        candlestick_patterns = {}
+        for symbol in ("NIFTY", "SENSEX"):
+            five_min_candles = self.engine.series(symbol, 300, include_current=True)
+            symbol_regime = analyses.get(symbol, {}).get("regime", "RANGING")
+            found = detect_patterns(five_min_candles, regime=symbol_regime)
+            candlestick_patterns[symbol] = summarize_bias(found)
+
+        self.candlestick_patterns = candlestick_patterns
+
         price_action = {
 
             symbol: self.price_action_brain.analyze(
@@ -973,7 +1004,7 @@ class MarketService:
             crude_change=-1.10,
 
         )
-        global_market = asdict(global_market)
+        global_market = self.to_json(global_market)
 
         # BUGFIX: LiveMarketAnalysis is a @dataclass, not a dict --
         # json.dumps()/websocket.send_json() cannot serialize it
@@ -981,10 +1012,7 @@ class MarketService:
         # broadcast (caught in broadcast()'s except block, which then
         # discarded the client), which is why the dashboard always
         # showed "Clients: 0" after the very first failed send.
-        live_market_serializable = {
-            symbol: asdict(analysis)
-            for symbol, analysis in live_market.items()
-        }
+        live_market_serializable = self.to_json(live_market)
 
         self.last_live_brains = {
             "price_action": price_action,
@@ -1065,6 +1093,8 @@ class MarketService:
             },
 
             "options": self.options_analysis,
+
+            "candlestick_patterns": self.candlestick_patterns,
 
             # Learned from the earlier LiveMarketAnalysis bug --
             # PatternAnalysis is also a dataclass, must be converted
@@ -1320,6 +1350,33 @@ class MarketService:
 
         for websocket in dead_clients:
             self.clients.discard(websocket)
+
+    @staticmethod
+    def to_json(obj):
+        """
+        Convert dataclasses, Enums, dicts and lists into
+        JSON-serializable objects.
+        """
+
+        if is_dataclass(obj):
+            obj = asdict(obj)
+
+        if isinstance(obj, Enum):
+            return obj.value
+
+        if isinstance(obj, dict):
+            return {
+                k: MarketService.to_json(v)
+                for k, v in obj.items()
+            }
+
+        if isinstance(obj, (list, tuple)):
+            return [
+                MarketService.to_json(v)
+                for v in obj
+            ]
+
+        return obj
 
 
 service = MarketService()

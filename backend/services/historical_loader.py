@@ -195,13 +195,35 @@ class HistoricalLoader:
             candles=history_5m,
         )
 
+        # --------------------------
+        # 10 Minute / 30 Minute / 1 Hour / 1 Day
+        # --------------------------
+        # Resampled from the same 1m history already fetched above --
+        # no extra API calls needed for these larger timeframes.
+
+        history_10m = CandleAggregator.aggregate(history_1m, timeframe_minutes=10)
+        self.engine.load_history(symbol=symbol, interval=600, candles=history_10m)
+
+        history_30m = CandleAggregator.aggregate(history_1m, timeframe_minutes=30)
+        self.engine.load_history(symbol=symbol, interval=1800, candles=history_30m)
+
+        history_1h = CandleAggregator.aggregate(history_1m, timeframe_minutes=60)
+        self.engine.load_history(symbol=symbol, interval=3600, candles=history_1h)
+
+        history_1d = CandleAggregator.aggregate(history_1m, timeframe_minutes=1440)
+        self.engine.load_history(symbol=symbol, interval=86400, candles=history_1d)
+
         logger.info(
-            "%s loaded | 1m=%d 2m=%d 3m=%d 5m=%d",
+            "%s loaded | 1m=%d 2m=%d 3m=%d 5m=%d 10m=%d 30m=%d 1h=%d 1d=%d",
             symbol,
             len(history_1m),
             len(history_2m),
             len(history_3m),
             len(history_5m),
+            len(history_10m),
+            len(history_30m),
+            len(history_1h),
+            len(history_1d),
         )
 
         return {
@@ -209,6 +231,10 @@ class HistoricalLoader:
             "2m": len(history_2m),
             "3m": len(history_3m),
             "5m": len(history_5m),
+            "10m": len(history_10m),
+            "30m": len(history_30m),
+            "1h": len(history_1h),
+            "1d": len(history_1d),
         }
 
     def load_multiple(

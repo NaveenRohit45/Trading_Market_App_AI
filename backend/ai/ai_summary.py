@@ -41,6 +41,7 @@ You receive structured JSON describing:
 - Multiple rule-based "brain" outputs (price action, live market conditions, global markets)
 - Options flow: Put-Call Ratio, max pain strike, open-interest shift bias (if available)
 - Pattern memory: whether this exact market setup has been seen before, how many times, and the REAL historical win rate for it (if available)
+- Candlestick patterns detected on the 5-minute chart (e.g. Bullish Engulfing, Doji, Morning Star) using textbook geometric definitions -- if present, weave these into your reasoning by name
 - The app's own V1 heuristic forecast probabilities (UP/DOWN/SIDEWAYS) per horizon
 - An ML model's prediction, IF one has been trained yet (may be absent -- say so plainly if missing)
 - The app's actual historical accuracy for these symbols/horizons from real resolved predictions
@@ -74,6 +75,7 @@ def _build_user_payload(symbol: str, snapshot: dict, accuracy_stats: list[dict])
 
     options_data = snapshot.get("options", {}).get(symbol)
     pattern_data = snapshot.get("pattern_memory", {}).get(symbol)
+    candlestick_data = snapshot.get("candlestick_patterns", {}).get(symbol)
 
     return {
         "symbol": symbol,
@@ -96,6 +98,11 @@ def _build_user_payload(symbol: str, snapshot: dict, accuracy_stats: list[dict])
             }
             if pattern_data and pattern_data.get("historical_matches", 0) > 0
             else "NO_HISTORICAL_MATCHES_YET"
+        ),
+        "candlestick_patterns_detected": (
+            candlestick_data.get("patterns")
+            if candlestick_data and candlestick_data.get("patterns")
+            else "NO_PATTERNS_DETECTED_THIS_CYCLE"
         ),
         "v1_heuristic_forecast": forecast_v1,
         "ml_model_forecast": forecast_ml if forecast_ml else "NO_TRAINED_MODEL_YET",
