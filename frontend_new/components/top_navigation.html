@@ -1,0 +1,90 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Top Navigation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#081018;font-family:Inter,sans-serif}
+.topbar{
+height:72px;
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:0 24px;
+background:#101827;
+border-bottom:1px solid #243447;
+color:#f8fafc}
+.left,.right{display:flex;align-items:center;gap:16px}
+.logo{font-weight:800;font-size:20px}
+.select, .search{
+background:#172033;border:1px solid #243447;color:#fff;
+border-radius:10px;padding:10px 14px}
+.search{width:260px}
+.status{display:flex;align-items:center;gap:8px;font-size:14px;color:#cbd5e1}
+.dot{width:10px;height:10px;border-radius:50%}
+.green{background:#22c55e}.blue{background:#06b6d4}
+.icon{
+width:40px;height:40px;border-radius:10px;background:#172033;
+display:grid;place-items:center;border:1px solid #243447;cursor:pointer}
+.profile{
+display:flex;align-items:center;gap:10px;padding:6px 12px;
+border:1px solid #243447;border-radius:12px;background:#172033}
+.avatar{
+width:36px;height:36px;border-radius:50%;
+background:#3b82f6;display:grid;place-items:center;font-weight:700}
+</style>
+</head>
+<body>
+<header class="topbar">
+
+<div class="left">
+<div class="logo">📈 Trading Market AI</div>
+
+<select class="select">
+<option>NIFTY 50</option>
+<option>BANK NIFTY</option>
+<option>SENSEX</option>
+<option>FINNIFTY</option>
+</select>
+
+<input class="search" placeholder="Search Symbol...">
+
+<div class="status">
+<span class="dot green"></span>
+<span>Market Open</span>
+</div>
+
+<div class="status">
+<span class="dot blue"></span>
+<span>AI Online</span>
+</div>
+
+<div class="status">
+⚡ 11 ms
+</div>
+
+</div>
+
+<div class="right">
+
+<div class="icon">🔔</div>
+<div class="icon">📅</div>
+<div class="icon">🌙</div>
+
+<div class="profile">
+<div class="avatar">SC</div>
+<div>
+<div style="font-weight:700">Super Cat</div>
+<div style="font-size:12px;color:#94a3b8">Administrator</div>
+</div>
+</div>
+
+</div>
+
+</header>
+</body>
+</html>

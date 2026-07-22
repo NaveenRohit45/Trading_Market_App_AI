@@ -1,0 +1,2 @@
+const l=document.getElementById('list');window.Notifications={update(a){l.innerHTML='';a.forEach(x=>l.innerHTML+=`<div class=item>${x.time} • ${x.msg}</div>`)}};
+let d=[[{time:'09:15',msg:'BUY signal generated'},{time:'09:18',msg:'Target 1 hit'}],[{time:'10:05',msg:'Risk level increased'},{time:'10:22',msg:'SELL signal generated'}]];let i=0;Notifications.update(d[0]);setInterval(()=>{i=(i+1)%2;Notifications.update(d[i])},5000);

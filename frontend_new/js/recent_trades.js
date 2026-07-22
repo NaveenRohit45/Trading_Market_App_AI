@@ -1,0 +1,2 @@
+const tb=document.getElementById('tb');window.RecentTrades={update(r){tb.innerHTML='';r.forEach(x=>tb.innerHTML+=`<tr><td>${x.time}</td><td>${x.symbol}</td><td class="${x.side=='BUY'?'buy':'sell'}">${x.side}</td><td>${x.pl}</td></tr>`)}};
+let d=[[{time:'09:20',symbol:'NIFTY',side:'BUY',pl:'+₹420'},{time:'10:15',symbol:'BANKNIFTY',side:'SELL',pl:'+₹780'}],[{time:'11:00',symbol:'FINNIFTY',side:'BUY',pl:'+₹210'},{time:'12:40',symbol:'MIDCPNIFTY',side:'SELL',pl:'-₹120'}]];let i=0;RecentTrades.update(d[0]);setInterval(()=>{i=(i+1)%2;RecentTrades.update(d[i])},5000);

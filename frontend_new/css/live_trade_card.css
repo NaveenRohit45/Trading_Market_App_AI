@@ -1,0 +1,6 @@
+body{margin:0;background:#0f172a;color:#fff;font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh}
+.card{width:420px;background:#162033;padding:24px;border-radius:18px;border:1px solid #24344f}
+h2{text-align:center}.signal{text-align:center;font-size:46px;font-weight:bold}.buy{color:#22c55e}.sell{color:#ef4444}.wait{color:#f59e0b}
+.price{text-align:center;margin:12px 0;font-size:22px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid div{background:#1e293b;padding:12px;border-radius:10px}.grid span{display:block;color:#94a3b8;font-size:12px}
+.status{text-align:center;margin-top:18px;font-weight:bold}

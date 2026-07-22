@@ -1,0 +1,145 @@
+
+/* ==========================================================
+   Trading Market AI V3
+   variables.css
+   Global Design Tokens
+   ========================================================== */
+
+:root{
+
+  /* =======================
+     Brand Colors
+  ======================= */
+
+  --primary:#3B82F6;
+  --primary-light:#60A5FA;
+  --primary-dark:#1D4ED8;
+
+  --secondary:#8B5CF6;
+  --accent:#06B6D4;
+
+  --success:#22C55E;
+  --warning:#F59E0B;
+  --danger:#EF4444;
+  --info:#38BDF8;
+
+  /* =======================
+     Backgrounds
+  ======================= */
+
+  --bg:#081018;
+  --bg-secondary:#0F172A;
+  --surface:#101827;
+  --surface-light:#172033;
+  --surface-hover:#1E293B;
+
+  /* =======================
+     Borders
+  ======================= */
+
+  --border:#243447;
+  --border-light:#334155;
+
+  /* =======================
+     Text
+  ======================= */
+
+  --text-primary:#F8FAFC;
+  --text-secondary:#CBD5E1;
+  --text-muted:#94A3B8;
+  --text-disabled:#64748B;
+
+  /* =======================
+     Trading Colors
+  ======================= */
+
+  --buy:#22C55E;
+  --sell:#EF4444;
+  --wait:#F59E0B;
+
+  --bull:#16A34A;
+  --bear:#DC2626;
+  --neutral:#64748B;
+
+  /* =======================
+     Shadows
+  ======================= */
+
+  --shadow-sm:0 2px 6px rgba(0,0,0,.15);
+  --shadow-md:0 8px 18px rgba(0,0,0,.25);
+  --shadow-lg:0 15px 40px rgba(0,0,0,.35);
+  --shadow-glow:0 0 20px rgba(59,130,246,.30);
+
+  /* =======================
+     Radius
+  ======================= */
+
+  --radius-xs:6px;
+  --radius-sm:10px;
+  --radius-md:16px;
+  --radius-lg:22px;
+  --radius-xl:28px;
+  --radius-pill:999px;
+
+  /* =======================
+     Layout
+  ======================= */
+
+  --sidebar-width:280px;
+  --topbar-height:72px;
+
+  --content-padding:24px;
+  --card-padding:20px;
+
+  --grid-gap:18px;
+
+  /* =======================
+     Typography
+  ======================= */
+
+  --font-family:'Inter',sans-serif;
+
+  --font-xs:.75rem;
+  --font-sm:.875rem;
+  --font-md:1rem;
+  --font-lg:1.125rem;
+  --font-xl:1.5rem;
+  --font-2xl:2rem;
+  --font-3xl:2.75rem;
+
+  --fw-normal:400;
+  --fw-medium:500;
+  --fw-semibold:600;
+  --fw-bold:700;
+  --fw-black:800;
+
+  /* =======================
+     Animation
+  ======================= */
+
+  --transition-fast:.18s ease;
+  --transition:.28s ease;
+  --transition-slow:.45s ease;
+
+  /* =======================
+     Z Index
+  ======================= */
+
+  --z-sidebar:100;
+  --z-topbar:200;
+  --z-modal:500;
+  --z-toast:1000;
+
+}
+
+/* Optional Dark Theme Alias */
+
+[data-theme="dark"]{
+  color-scheme:dark;
+}
+
+/* Future Light Theme */
+
+[data-theme="light"]{
+
+}

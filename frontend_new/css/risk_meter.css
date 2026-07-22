@@ -1,0 +1,7 @@
+body{margin:0;background:#0f172a;color:#fff;font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh}
+.risk-card{background:#162033;padding:30px;border-radius:18px;width:360px;text-align:center;border:1px solid #23314f}
+.gauge{position:relative;width:240px;height:120px;margin:20px auto;border-top-left-radius:240px;border-top-right-radius:240px;background:conic-gradient(from 180deg,#22c55e 0 35%,#f59e0b 35% 70%,#ef4444 70% 100%);overflow:hidden}
+.gauge:before{content:'';position:absolute;left:20px;top:20px;width:200px;height:100px;background:#162033;border-top-left-radius:200px;border-top-right-radius:200px}
+.needle{position:absolute;left:50%;bottom:0;width:4px;height:95px;background:#fff;transform-origin:bottom center;transform:translateX(-50%) rotate(-65deg);transition:.8s}
+.center{position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;left:50%;bottom:-9px;transform:translateX(-50%)}
+.score{font-size:54px;font-weight:bold}.level{color:#22c55e;font-size:22px;font-weight:bold}

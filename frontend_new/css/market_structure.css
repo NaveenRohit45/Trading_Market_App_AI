@@ -1,0 +1,5 @@
+body{margin:0;background:#0f172a;color:#fff;font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh}
+.card{width:520px;background:#162033;padding:24px;border-radius:18px;border:1px solid #24344f}
+h2{text-align:center}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid div{background:#1e293b;padding:12px;border-radius:10px}
+.grid span{display:block;color:#94a3b8;font-size:12px}p{background:#1e293b;padding:12px;border-radius:10px;margin-top:16px}

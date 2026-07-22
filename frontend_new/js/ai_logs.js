@@ -1,0 +1,1 @@
+window.AILogs={update(t){log.textContent=t.join('\n')}};const a=[['[09:15] Loading market','[09:15] AI confidence 91%','[09:16] BUY issued'],['[10:05] Volatility spike','[10:06] Risk updated','[10:07] HOLD mode']];let i=0;AILogs.update(a[0]);setInterval(()=>{i=(i+1)%2;AILogs.update(a[i])},5000);

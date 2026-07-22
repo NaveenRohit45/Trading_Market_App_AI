@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Confidence Ring</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/confidence_ring.css">
+</head>
+<body>
+
+<div class="confidence-card">
+
+    <div class="ring-container">
+
+        <svg class="ring" viewBox="0 0 220 220">
+
+            <defs>
+                <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#06B6D4"/>
+                    <stop offset="100%" stop-color="#22C55E"/>
+                </linearGradient>
+            </defs>
+
+            <circle class="ring-bg"
+                    cx="110"
+                    cy="110"
+                    r="90">
+            </circle>
+
+            <circle id="ringProgress"
+                    class="ring-progress"
+                    cx="110"
+                    cy="110"
+                    r="90">
+            </circle>
+
+        </svg>
+
+        <div class="ring-center">
+
+            <div id="confidenceValue" class="confidence-value">
+                92%
+            </div>
+
+            <div id="confidenceSignal" class="confidence-signal buy">
+                BUY
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="confidence-footer">
+
+        <div class="info-row">
+            <span>Trend</span>
+            <strong id="trend">Bullish</strong>
+        </div>
+
+        <div class="info-row">
+            <span>Risk</span>
+            <strong id="risk">Low</strong>
+        </div>
+
+        <div class="info-row">
+            <span>Accuracy</span>
+            <strong id="accuracy">89%</strong>
+        </div>
+
+    </div>
+
+</div>
+
+<script src="../js/confidence_ring.js"></script>
+
+</body>
+</html>

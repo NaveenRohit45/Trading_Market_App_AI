@@ -1,0 +1,157 @@
+
+/* ==========================================================
+   Trading Market AI V3
+   responsive.css
+   Responsive Layout Rules
+   ========================================================== */
+
+/* Ultra-wide monitors */
+@media (min-width: 1800px){
+  .container-xl{max-width:1700px;margin:0 auto;}
+  .grid-dashboard{grid-template-columns:3fr 1.2fr;}
+  .bottom-grid{grid-template-columns:repeat(6,1fr);}
+}
+
+/* Large desktops */
+@media (max-width: 1600px){
+  .grid-dashboard{grid-template-columns:2fr 1fr;}
+  .chart-container{min-height:520px;}
+}
+
+/* Laptops */
+@media (max-width: 1400px){
+  :root{
+    --sidebar-width:250px;
+    --content-padding:20px;
+  }
+  .bottom-grid{grid-template-columns:repeat(3,1fr);}
+}
+
+/* Tablets */
+@media (max-width: 1200px){
+  .grid-dashboard{
+    grid-template-columns:1fr;
+  }
+
+  .ai-panel{
+    order:-1;
+  }
+
+  .chart-container{
+    min-height:450px;
+  }
+}
+
+/* Small tablets */
+@media (max-width: 992px){
+
+  .app-shell{
+    flex-direction:column;
+  }
+
+  .sidebar{
+    position:fixed;
+    left:-100%;
+    top:0;
+    bottom:0;
+    width:260px;
+    z-index:1000;
+    transition:left .3s ease;
+  }
+
+  .sidebar.open{
+    left:0;
+  }
+
+  .content{
+    margin-left:0;
+    width:100%;
+  }
+
+  .topbar{
+    padding:0 16px;
+  }
+
+  .bottom-grid{
+    grid-template-columns:repeat(2,1fr);
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px){
+
+  :root{
+    --content-padding:16px;
+    --card-padding:16px;
+  }
+
+  .topbar{
+    height:auto;
+    min-height:64px;
+    flex-wrap:wrap;
+  }
+
+  .metric-grid,
+  .bottom-grid{
+    grid-template-columns:1fr;
+  }
+
+  .chart-container{
+    min-height:320px;
+  }
+
+  .card{
+    border-radius:14px;
+  }
+
+  h1{font-size:1.6rem;}
+  h2{font-size:1.3rem;}
+  h3{font-size:1.1rem;}
+
+  .hide-mobile{
+    display:none !important;
+  }
+
+  .show-mobile{
+    display:block !important;
+  }
+}
+
+/* Small phones */
+@media (max-width: 480px){
+
+  body{
+    font-size:14px;
+  }
+
+  .sidebar{
+    width:100%;
+  }
+
+  .chart-container{
+    min-height:260px;
+  }
+
+  .action-buttons{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+
+  .status-bar{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:8px;
+  }
+}
+
+/* Landscape phones */
+@media (max-height: 600px){
+  .chart-container{
+    min-height:220px;
+  }
+
+  .topbar{
+    min-height:56px;
+  }
+}

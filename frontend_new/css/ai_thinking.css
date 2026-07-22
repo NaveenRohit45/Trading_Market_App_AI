@@ -1,0 +1,8 @@
+
+body{margin:0;background:#0f172a;color:#fff;font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh}
+.thinking-card{width:520px;background:#162033;border:1px solid #24344f;border-radius:18px;padding:24px;box-shadow:0 15px 40px rgba(0,0,0,.4)}
+h2{text-align:center;margin-top:0}
+.brain{text-align:center;font-size:64px;animation:pulse 1.5s infinite}
+.status{text-align:center;font-size:20px;font-weight:bold;margin:15px 0;color:#38bdf8}
+.step{padding:10px 14px;margin:8px 0;background:#1e293b;border-radius:10px}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}

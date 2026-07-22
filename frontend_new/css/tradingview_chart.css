@@ -1,0 +1,4 @@
+body{margin:0;background:#0f172a;font-family:Arial;color:#fff}
+.tv-card{width:100%;height:100vh;background:#111827}
+.toolbar{height:52px;display:flex;justify-content:space-between;align-items:center;padding:0 18px;background:#162033;border-bottom:1px solid #23314f}
+.chart{width:100%;height:calc(100vh - 52px)}

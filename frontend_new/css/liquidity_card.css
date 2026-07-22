@@ -1,0 +1,9 @@
+body{margin:0;background:#0f172a;font-family:Arial,sans-serif;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh}
+.liquidity-card{width:360px;background:#162033;padding:24px;border-radius:18px;border:1px solid #24344f;box-shadow:0 15px 40px rgba(0,0,0,.4)}
+h2{text-align:center;margin:0 0 20px}
+.score{font-size:48px;font-weight:bold;text-align:center;color:#22c55e}
+.bar{height:14px;background:#24344f;border-radius:20px;overflow:hidden;margin:18px 0}
+.fill{height:100%;width:82%;background:linear-gradient(90deg,#22c55e,#06b6d4);transition:.8s}
+.status{text-align:center;font-weight:bold;color:#22c55e;margin-bottom:20px}
+.stats div{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid #2b3d5d}
+.stats span{color:#94a3b8}

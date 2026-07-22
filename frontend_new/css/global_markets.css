@@ -1,0 +1,11 @@
+
+body{margin:0;background:#0f172a;color:#fff;font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh}
+.card{width:760px;background:#162033;border:1px solid #24344f;border-radius:18px;padding:24px}
+h2{text-align:center;margin-top:0}
+table{width:100%;border-collapse:collapse;background:#1e293b;border-radius:10px;overflow:hidden}
+th,td{padding:12px;text-align:center;border-bottom:1px solid #334155}
+th{background:#24344f}
+.up{color:#22c55e;font-weight:bold}
+.down{color:#ef4444;font-weight:bold}
+.open{color:#38bdf8}
+.closed{color:#94a3b8}

@@ -1,0 +1,1 @@
+window.LearningBrain={update(d){for(const k in d){let e=document.getElementById(k);if(e)e.textContent=d[k];}};const x=[{t:'LEARNING',p:'1284',a:'+2.4%',v:'v3.2',n:'AI is continuously improving.'},{t:'OPTIMIZING',p:'1348',a:'+3.1%',v:'v3.3',n:'Models are being optimized.'}];let i=0;LearningBrain.update(x[0]);setInterval(()=>{i=(i+1)%2;LearningBrain.update(x[i])},5000);

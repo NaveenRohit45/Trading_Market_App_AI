@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>WebSocket Demo</title></head>
+<body>
+<h2>Trading Market AI V3 - WebSocket Demo</h2>
+<p>Open browser console to see incoming events.</p>
+<script src="websocket.js"></script>
+<script>
+const socket=new TradingWebSocket("ws://localhost:8000/ws");
+socket.on("open",()=>console.log("Connected"));
+socket.on("message",d=>console.log("Message:",d));
+socket.connect();
+</script>
+</body></html>

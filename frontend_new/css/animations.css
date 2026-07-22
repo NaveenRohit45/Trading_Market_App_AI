@@ -1,0 +1,272 @@
+
+/* ==========================================================
+   Trading Market AI V3
+   animations.css
+   Reusable Animation Library
+   ========================================================== */
+
+/* ===== Fade ===== */
+
+@keyframes fadeIn{
+    from{
+        opacity:0;
+    }
+    to{
+        opacity:1;
+    }
+}
+
+.fade-in{
+    animation:fadeIn .4s ease forwards;
+}
+
+/* ===== Slide ===== */
+
+@keyframes slideUp{
+    from{
+        opacity:0;
+        transform:translateY(24px);
+    }
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+
+.slide-up{
+    animation:slideUp .45s ease forwards;
+}
+
+@keyframes slideLeft{
+    from{
+        opacity:0;
+        transform:translateX(30px);
+    }
+    to{
+        opacity:1;
+        transform:translateX(0);
+    }
+}
+
+.slide-left{
+    animation:slideLeft .45s ease;
+}
+
+/* ===== Zoom ===== */
+
+@keyframes zoomIn{
+    from{
+        opacity:0;
+        transform:scale(.9);
+    }
+    to{
+        opacity:1;
+        transform:scale(1);
+    }
+}
+
+.zoom-in{
+    animation:zoomIn .35s ease;
+}
+
+/* ===== Pulse ===== */
+
+@keyframes pulse{
+    0%,100%{
+        transform:scale(1);
+    }
+    50%{
+        transform:scale(1.04);
+    }
+}
+
+.pulse{
+    animation:pulse 2s infinite;
+}
+
+/* ===== Glow ===== */
+
+@keyframes glow{
+
+    0%,100%{
+        box-shadow:0 0 0 rgba(59,130,246,0);
+    }
+
+    50%{
+        box-shadow:
+        0 0 10px rgba(59,130,246,.35),
+        0 0 24px rgba(59,130,246,.18);
+    }
+
+}
+
+.glow{
+    animation:glow 2.4s infinite;
+}
+
+/* ===== Buy Signal ===== */
+
+@keyframes buyFlash{
+
+    0%,100%{
+        box-shadow:0 0 0 rgba(34,197,94,0);
+    }
+
+    50%{
+        box-shadow:
+        0 0 18px rgba(34,197,94,.6);
+    }
+
+}
+
+.buy-signal{
+    animation:buyFlash 1.5s infinite;
+}
+
+/* ===== Sell Signal ===== */
+
+@keyframes sellFlash{
+
+    0%,100%{
+        box-shadow:0 0 0 rgba(239,68,68,0);
+    }
+
+    50%{
+        box-shadow:
+        0 0 18px rgba(239,68,68,.6);
+    }
+
+}
+
+.sell-signal{
+    animation:sellFlash 1.5s infinite;
+}
+
+/* ===== AI Thinking ===== */
+
+@keyframes thinkingDots{
+
+    0%{content:"";}
+    25%{content:".";}
+    50%{content:"..";}
+    75%{content:"...";}
+    100%{content:"";}
+}
+
+/* Spinner */
+
+@keyframes spin{
+
+    from{
+        transform:rotate(0deg);
+    }
+
+    to{
+        transform:rotate(360deg);
+    }
+
+}
+
+.spinner{
+    animation:spin 1s linear infinite;
+}
+
+/* ===== Floating ===== */
+
+@keyframes floating{
+
+    0%,100%{
+        transform:translateY(0px);
+    }
+
+    50%{
+        transform:translateY(-8px);
+    }
+
+}
+
+.float{
+    animation:floating 3s ease-in-out infinite;
+}
+
+/* ===== Notification ===== */
+
+@keyframes notification{
+
+    from{
+        transform:translateX(120%);
+        opacity:0;
+    }
+
+    to{
+        transform:translateX(0);
+        opacity:1;
+    }
+
+}
+
+.toast-enter{
+    animation:notification .35s ease forwards;
+}
+
+/* ===== Progress ===== */
+
+@keyframes progress{
+
+    from{
+        width:0%;
+    }
+
+    to{
+        width:100%;
+    }
+
+}
+
+.progress-animate{
+    animation:progress 2s linear forwards;
+}
+
+/* ===== Market Heartbeat ===== */
+
+@keyframes heartbeat{
+
+    0%,100%{
+        transform:scale(1);
+    }
+
+    25%{
+        transform:scale(1.03);
+    }
+
+    50%{
+        transform:scale(1.08);
+    }
+
+    75%{
+        transform:scale(1.03);
+    }
+
+}
+
+.market-live{
+    animation:heartbeat 1.6s infinite;
+}
+
+/* ===== Hover ===== */
+
+.hover-lift{
+    transition:.25s;
+}
+
+.hover-lift:hover{
+    transform:translateY(-4px);
+}
+
+.hover-scale{
+    transition:.25s;
+}
+
+.hover-scale:hover{
+    transform:scale(1.03);
+}

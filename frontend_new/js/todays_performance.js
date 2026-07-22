@@ -1,0 +1,1 @@
+window.TodaysPerformance={update(d){t.textContent=d.t;w.textContent=d.w;r.textContent=d.r;p.textContent=d.p;}};const a=[{t:'18',w:'15',r:'83%',p:'₹12,480'},{t:'22',w:'18',r:'82%',p:'₹15,920'}];let i=0;TodaysPerformance.update(a[0]);setInterval(()=>{i=(i+1)%2;TodaysPerformance.update(a[i])},5000);

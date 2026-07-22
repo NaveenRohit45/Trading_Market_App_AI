@@ -1,0 +1,9 @@
+body{margin:0;background:#0f172a;color:#fff;font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh}
+.panel{width:760px;background:#162033;border:1px solid #24344f;border-radius:18px;padding:24px;box-shadow:0 15px 40px rgba(0,0,0,.4)}
+h2{text-align:center;margin:0 0 20px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.card{background:#1e293b;padding:18px;border-radius:12px}
+.card span{display:block;color:#94a3b8;font-size:13px}
+.card strong{display:block;font-size:24px;margin-top:8px}
+button{margin-top:22px;width:100%;padding:14px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:16px;font-weight:bold;cursor:pointer}
+button:hover{background:#1d4ed8}

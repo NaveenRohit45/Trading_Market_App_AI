@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sidebar Component</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/variables.css">
+<link rel="stylesheet" href="../css/dashboard.css">
+<link rel="stylesheet" href="../css/animations.css">
+<style>
+body{margin:0;background:#081018;font-family:Inter,sans-serif}
+.sidebar{width:280px;height:100vh;background:#101827;border-right:1px solid #243447;display:flex;flex-direction:column}
+.brand{padding:24px;border-bottom:1px solid #243447}
+.brand h1{margin:0;color:#22d3ee;font-size:24px}
+.brand p{margin:6px 0 0;color:#94a3b8;font-size:13px}
+.nav{padding:16px;display:flex;flex-direction:column;gap:8px}
+.nav a{text-decoration:none;color:#cbd5e1;padding:14px 16px;border-radius:14px;display:flex;align-items:center;gap:12px;transition:.25s}
+.nav a:hover,.nav a.active{background:#172033;color:#fff}
+.icon{width:24px;text-align:center}
+.footer{margin-top:auto;padding:16px;border-top:1px solid #243447}
+.status{display:flex;justify-content:space-between;font-size:13px;color:#94a3b8}
+.badge{padding:4px 8px;border-radius:999px;background:#14532d;color:#86efac;font-weight:700}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+<div class="brand">
+<h1>Trading Market AI</h1>
+<p>AI Command Center</p>
+</div>
+
+<nav class="nav">
+<a class="active" href="#"><span class="icon">🏠</span>Dashboard</a>
+<a href="#"><span class="icon">📈</span>Live Market</a>
+<a href="#"><span class="icon">🧠</span>AI Command Center</a>
+<a href="#"><span class="icon">🗳️</span>Brain Voting</a>
+<a href="#"><span class="icon">🎯</span>Trade Signals</a>
+<a href="#"><span class="icon">📊</span>Analytics</a>
+<a href="#"><span class="icon">💼</span>Portfolio</a>
+<a href="#"><span class="icon">📰</span>Market News</a>
+<a href="#"><span class="icon">🤖</span>Learning Brain</a>
+<a href="#"><span class="icon">⚙️</span>Settings</a>
+</nav>
+
+<div class="footer">
+<div class="status">
+<span>AI Status</span>
+<span class="badge">ONLINE</span>
+</div>
+<div class="status" style="margin-top:10px">
+<span>Market</span>
+<span style="color:#22c55e">OPEN</span>
+</div>
+</div>
+</aside>
+</body>
+</html>

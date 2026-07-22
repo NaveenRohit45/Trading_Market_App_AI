@@ -1,0 +1,1 @@
+window.Footer={update(d){status.textContent=d.status;status.style.color=d.color||'#22c55e';}};setInterval(()=>{Footer.update({status:'● Connected',color:'#22c55e'})},5000);

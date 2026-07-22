@@ -1,0 +1,1 @@
+window.AIStatistics={update(d){tr.textContent=d.tr;wr.textContent=d.wr;pf.textContent=d.pf;cf.textContent=d.cf;}};const s=[{tr:'1248',wr:'84%',pf:'₹2.45L',cf:'89%'},{tr:'1289',wr:'86%',pf:'₹2.71L',cf:'91%'}];let i=0;AIStatistics.update(s[0]);setInterval(()=>{i=(i+1)%2;AIStatistics.update(s[i])},5000);

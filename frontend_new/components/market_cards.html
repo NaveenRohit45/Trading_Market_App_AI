@@ -1,0 +1,81 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Market Cards</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#081018;font-family:Inter,sans-serif;color:#fff;padding:24px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px}
+.card{background:#101827;border:1px solid #243447;border-radius:18px;padding:18px;transition:.25s}
+.card:hover{transform:translateY(-4px);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.head{display:flex;justify-content:space-between;align-items:center;color:#94a3b8}
+.value{font-size:2rem;font-weight:800;margin:12px 0 6px}
+.up{color:#22c55e}.down{color:#ef4444}.wait{color:#f59e0b}
+.bar{height:8px;background:#172033;border-radius:999px;overflow:hidden;margin-top:12px}
+.fill{height:100%;background:#3b82f6}
+small{color:#94a3b8}
+</style>
+</head>
+<body>
+
+<div class="grid">
+
+<div class="card">
+<div class="head"><span>NIFTY 50</span><span class="up">▲</span></div>
+<div class="value">24,952.35</div>
+<small class="up">+126.45 (+0.51%)</small>
+<div class="bar"><div class="fill" style="width:78%"></div></div>
+</div>
+
+<div class="card">
+<div class="head"><span>BANK NIFTY</span><span class="up">▲</span></div>
+<div class="value">56,420.10</div>
+<small class="up">+342.20 (+0.61%)</small>
+<div class="bar"><div class="fill" style="width:82%"></div></div>
+</div>
+
+<div class="card">
+<div class="head"><span>SENSEX</span><span class="down">▼</span></div>
+<div class="value">81,104.70</div>
+<small class="down">-42.35 (-0.05%)</small>
+<div class="bar"><div class="fill" style="width:41%"></div></div>
+</div>
+
+<div class="card">
+<div class="head"><span>AI Confidence</span><span>🧠</span></div>
+<div class="value up">92%</div>
+<small>BUY Signal Active</small>
+<div class="bar"><div class="fill" style="width:92%"></div></div>
+</div>
+
+<div class="card">
+<div class="head"><span>Market Trend</span><span>📈</span></div>
+<div class="value up">Bullish</div>
+<small>Strong Momentum</small>
+</div>
+
+<div class="card">
+<div class="head"><span>Volatility</span><span>⚡</span></div>
+<div class="value wait">Medium</div>
+<small>VIX Stable</small>
+</div>
+
+<div class="card">
+<div class="head"><span>Institutional Flow</span><span>🏦</span></div>
+<div class="value up">+₹845Cr</div>
+<small>Net Buying</small>
+</div>
+
+<div class="card">
+<div class="head"><span>Options PCR</span><span>📊</span></div>
+<div class="value">1.18</div>
+<small class="up">Bullish Bias</small>
+</div>
+
+</div>
+
+</body>
+</html>
