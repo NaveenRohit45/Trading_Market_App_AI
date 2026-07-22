@@ -13,6 +13,10 @@
 <main role="main" id="main-content">
 <header><span><i></i> Live Engine</span><span id="clock"></span><span class="pill">Prediction cycle: 3m</span></header>
 <div id="page-dashboard" class="page active">
+<div id="riskBrainBanner" class="risk-banner" style="display:none">
+    <span>\u26a0\ufe0f RISK BRAIN: STOP-TRADING ACTIVE</span>
+    <span id="riskBrainMessage"></span>
+</div>
 <section class="grid top">
 <div class="card index"><h3>NIFTY 50</h3><div class="price skeleton" id="niftyPrice">Loading</div><div class="state skeleton" id="niftyState">Loading</div><div class="mini"><span>Support <b id="niftySupport">--</b></span><span>Resistance <b id="niftyResistance">--</b></span></div></div>
 <div class="card index"><h3>SENSEX</h3><div class="price skeleton" id="sensexPrice">Loading</div><div class="state skeleton" id="sensexState">Loading</div><div class="mini"><span>Support <b id="sensexSupport">--</b></span><span>Resistance <b id="sensexResistance">--</b></span></div></div>
@@ -234,6 +238,25 @@
 </div>
 
 <div id="page-history" class="page">
+    <section class="grid two-col">
+        <div class="card">
+            <h3>\ud83d\udcbc Portfolio / Risk Brain</h3>
+            <p style="font-size:12px;color:var(--text-muted);margin:6px 0 14px">Hypothetical P/L based on resolved predictions -- this app does not place real orders. Shows what following the system's calls would have done, and enforces stop-trading discipline.</p>
+            <table style="width:100%;font-size:13px" id="portfolioTable">
+                <tr><td style="padding:6px 0;color:var(--text-muted)">Today's P/L</td><td id="portfolioToday">--</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted)">This week's P/L</td><td id="portfolioWeek">--</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted)">Max drawdown</td><td id="portfolioDrawdown">--</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted)">Win rate</td><td id="portfolioWinRate">--</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted)">Current streak</td><td id="portfolioStreak">--</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted)">Stop-trading</td><td id="portfolioStopFlag">--</td></tr>
+            </table>
+        </div>
+        <div class="card">
+            <h3>\ud83e\udde0 Failure Reason Patterns</h3>
+            <p style="font-size:12px;color:var(--text-muted);margin:6px 0 14px">Real combinations of conditions present when calls were wrong -- needs enough resolved wrong calls with the same combination (3+) before a pattern shows here.</p>
+            <div id="failureReasonsTable"><p class="page-placeholder">Loading...</p></div>
+        </div>
+    </section>
     <section class="grid top">
         <div class="card" style="grid-column: 1 / -1">
             <h3>History &amp; Accuracy</h3>

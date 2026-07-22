@@ -52,6 +52,10 @@ def accuracy(): return service.db.accuracy()
 @app.get("/api/replay")
 def replay(symbol: str = "NIFTY", limit: int = 200): return service.db.replay_session(symbol, min(limit, 500))
 
+@app.get("/api/failure-reasons")
+def failure_reasons(symbol: str | None = None, min_occurrences: int = 3):
+    return service.db.failure_reason_stats(symbol, min_occurrences)
+
 @app.get("/api/candles")
 def candles(symbol: str = "NIFTY", interval: int = 60, limit: int = 200):
     VALID_INTERVALS = {60, 120, 180, 300, 600, 1800, 3600, 86400}

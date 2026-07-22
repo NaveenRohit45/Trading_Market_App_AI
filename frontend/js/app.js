@@ -862,6 +862,7 @@ console.log(d);
     safeRender('renderAdaptiveVerdict', () => renderAdaptiveVerdict(d));
     safeRender('renderAlertToasts', () => renderAlertToasts(d));
     safeRender('renderPatternBadge', () => renderPatternBadge(d));
+    safeRender('renderPortfolioBrain', () => renderPortfolioBrain(d));
 
     for (
         const [key, id]
@@ -1259,7 +1260,7 @@ function setActivePage(pageName) {
         }
     });
 
-    if (pageName === 'history') loadHistoryPage();
+    if (pageName === 'history') { loadHistoryPage(); loadFailureReasons(); }
     if (pageName === 'settings') loadSettingsPage();
     if (pageName === 'replay') loadReplayData();
     if (window.__lastSnapshot) renderAllDetailPages(window.__lastSnapshot);
@@ -1847,4 +1848,66 @@ async function updatePredictionCycle() {
 initChartTimeframeButtons();
 loadCandleChart();
 startChartAutoRefresh();
+
+
+// --------------------------------------------------
+// PORTFOLIO / RISK BRAIN
+// --------------------------------------------------
+
+function renderPortfolioBrain(d) {
+    const portfolio = d.portfolio;
+    if (!portfolio) return;
+
+    const banner = $('riskBrainBanner');
+    const bannerMsg = $('riskBrainMessage');
+    if (banner) {
+        banner.style.display = portfolio.stop_trading ? 'flex' : 'none';
+        if (bannerMsg) {
+            bannerMsg.textContent = `${portfolio.current_streak} consecutive losses \u2014 verdicts suppressed until this changes.`;
+        }
+    }
+
+    const set = (id, value) => { const el = $(id); if (el) el.textContent = value; };
+
+    set('portfolioToday', `${portfolio.today_pnl_pct >= 0 ? '+' : ''}${portfolio.today_pnl_pct} units`);
+    set('portfolioWeek', `${portfolio.week_pnl_pct >= 0 ? '+' : ''}${portfolio.week_pnl_pct} units`);
+    set('portfolioDrawdown', `${portfolio.max_drawdown_pct} units`);
+    set('portfolioWinRate', portfolio.win_rate != null ? `${portfolio.win_rate}%` : '--');
+    set('portfolioStreak', portfolio.streak_type ? `${portfolio.current_streak} ${portfolio.streak_type}${portfolio.current_streak > 1 ? 'S' : ''}` : '--');
+
+    const stopEl = $('portfolioStopFlag');
+    if (stopEl) {
+        stopEl.textContent = portfolio.stop_trading ? 'ACTIVE \u26a0\ufe0f' : 'Inactive';
+        stopEl.style.color = portfolio.stop_trading ? '#ff4f5f' : 'var(--text-primary)';
+    }
+}
+
+
+async function loadFailureReasons() {
+    const el = $('failureReasonsTable');
+    if (!el) return;
+
+    try {
+        const data = await fetch('/api/failure-reasons?min_occurrences=3').then(r => r.json());
+
+        if (!Array.isArray(data) || !data.length) {
+            el.innerHTML = '<p class="page-placeholder">No repeated failure patterns identified yet (needs 3+ occurrences of the same condition combination).</p>';
+            return;
+        }
+
+        el.innerHTML = data.slice(0, 15).map(row => `
+            <div class="failure-row">
+                <div>
+                    <b>${row.direction}</b> calls when
+                    <span class="failure-reason-tags">${row.reasons.join(' + ')}</span>
+                    (${row.occurrences}x)
+                </div>
+                <div class="failure-rate">${row.failure_rate}% fail</div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Failed to load failure reasons:', error);
+        el.innerHTML = '<p class="page-placeholder">Failed to load failure reason data.</p>';
+    }
+}
 

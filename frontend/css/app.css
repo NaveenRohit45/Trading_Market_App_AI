@@ -65,3 +65,9 @@ nav a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .pattern-chip.bullish{color:#31df95;border-color:#1c5c42;background:rgba(49,223,149,.08)}
 .pattern-chip.bearish{color:#ff4f5f;border-color:#5c1c22;background:rgba(255,79,95,.08)}
 .pattern-chip.neutral{color:var(--text-muted);border-color:var(--border-strong);background:rgba(138,151,168,.06)}
+
+.risk-banner{display:flex;justify-content:space-between;align-items:center;background:rgba(255,79,95,.12);border:1px solid #ff4f5f;color:#ff9aa3;border-radius:8px;padding:10px 16px;margin-bottom:14px;font-size:13px;font-weight:600}
+.failure-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+.failure-row:last-child{border-bottom:none}
+.failure-reason-tags{color:var(--text-muted);font-size:11px}
+.failure-rate{font-weight:700;color:#ff4f5f}

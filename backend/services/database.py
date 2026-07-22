@@ -33,8 +33,14 @@ class Database:
             c.execute('''CREATE TABLE IF NOT EXISTS brain_calls(
               id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, symbol TEXT,
               brain TEXT, horizon INTEGER, price REAL, direction TEXT,
-              regime TEXT,
+              regime TEXT, context TEXT, failure_reasons TEXT,
               resolved INTEGER DEFAULT 0, actual_direction TEXT, correct INTEGER)''')
+            # Add columns if the DB already existed before this change.
+            for col in ("context", "failure_reasons"):
+                try:
+                    c.execute(f"ALTER TABLE brain_calls ADD COLUMN {col} TEXT")
+                except sqlite3.OperationalError:
+                    pass
 
     def conn(self): return sqlite3.connect(self.path)
 
@@ -62,27 +68,86 @@ class Database:
                     c.execute("UPDATE predictions SET resolved=1,actual_direction=?,correct=? WHERE id=?",
                               (actual, int(actual==direction), rid))
 
-    def add_brain_call(self, ts, symbol, brain, horizon, price, direction, regime=None):
+    def add_brain_call(self, ts, symbol, brain, horizon, price, direction, regime=None, context=None):
         with self.conn() as c:
             c.execute(
-                "INSERT INTO brain_calls(ts,symbol,brain,horizon,price,direction,regime) VALUES(?,?,?,?,?,?,?)",
-                (ts, symbol, brain, horizon, price, direction, regime),
+                "INSERT INTO brain_calls(ts,symbol,brain,horizon,price,direction,regime,context) VALUES(?,?,?,?,?,?,?,?)",
+                (ts, symbol, brain, horizon, price, direction, regime,
+                 json.dumps(context) if context else None),
             )
 
     def resolve_brain_calls(self, now, prices):
+        from backend.analyzers.failure_reasons import compute_failure_reasons
+
         with self.conn() as c:
             rows = c.execute(
-                "SELECT id,ts,symbol,horizon,price,direction FROM brain_calls WHERE resolved=0"
+                "SELECT id,ts,symbol,horizon,price,direction,context FROM brain_calls WHERE resolved=0"
             ).fetchall()
-            for rid, ts, sym, h, p0, direction in rows:
+            for rid, ts, sym, h, p0, direction, context_json in rows:
                 if now - ts >= h * 60 and sym in prices:
                     p1 = prices[sym]
                     pct = (p1 - p0) / p0 * 100 if p0 else 0
                     actual = "UP" if pct > 0.03 else "DOWN" if pct < -0.03 else "SIDEWAYS"
+                    correct = int(actual == direction)
+
+                    failure_reasons_json = None
+                    if not correct and context_json:
+                        try:
+                            context = json.loads(context_json)
+                            reasons = compute_failure_reasons(direction, context)
+                            failure_reasons_json = json.dumps(reasons)
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
                     c.execute(
-                        "UPDATE brain_calls SET resolved=1,actual_direction=?,correct=? WHERE id=?",
-                        (actual, int(actual == direction), rid),
+                        "UPDATE brain_calls SET resolved=1,actual_direction=?,correct=?,failure_reasons=? WHERE id=?",
+                        (actual, correct, failure_reasons_json, rid),
                     )
+
+    def failure_reason_stats(self, symbol=None, min_occurrences=3):
+        """
+        THE query that answers "never buy when resistance + high vol +
+        negative news" -- counts how often each failure-reason
+        COMBINATION shows up across actual wrong calls, and its
+        overall win rate when that combination was present (including
+        the times it happened to still be right).
+        """
+        query = "SELECT direction, failure_reasons, correct FROM brain_calls WHERE resolved=1 AND failure_reasons IS NOT NULL"
+        params = []
+        if symbol:
+            query += " AND symbol=?"
+            params.append(symbol)
+
+        with self.conn() as c:
+            rows = c.execute(query, params).fetchall()
+
+        combo_stats = {}
+        for direction, reasons_json, correct in rows:
+            try:
+                reasons = tuple(sorted(json.loads(reasons_json)))
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if not reasons:
+                continue
+            key = (direction, reasons)
+            combo_stats.setdefault(key, {"wrong": 0, "total": 0})
+            combo_stats[key]["total"] += 1
+            if not correct:
+                combo_stats[key]["wrong"] += 1
+
+        results = []
+        for (direction, reasons), stats in combo_stats.items():
+            if stats["total"] < min_occurrences:
+                continue
+            results.append({
+                "direction": direction,
+                "reasons": list(reasons),
+                "occurrences": stats["total"],
+                "failure_rate": round(100 * stats["wrong"] / stats["total"], 1),
+            })
+
+        results.sort(key=lambda r: r["failure_rate"], reverse=True)
+        return results
 
     def brain_accuracy(self, symbol=None, regime=None, lookback=100):
         """

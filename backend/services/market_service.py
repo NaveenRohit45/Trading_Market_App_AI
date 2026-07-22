@@ -20,6 +20,7 @@ from backend.data.news_ingestor import AutoNewsIngestor
 from backend.brains.learning.learning_brain import LearningBrain
 from backend.brains.learning.pattern_memory import PatternMemory
 from backend.brains.learning.models import PredictionRecord
+from backend.analyzers.portfolio_brain import compute_portfolio_stats
 import httpx
 from backend.services.database import Database
 from backend.data.demo_provider import DemoProvider
@@ -117,6 +118,9 @@ class MarketService:
         self.last_news_fetch_time = 0
 
         self.last_regime = {}  # {symbol: regime} -- for change detection
+
+        self.portfolio_stats = compute_portfolio_stats([])  # cold-start default
+        self.last_stop_trading_state = False
 
         # Pattern Memory / Learning Brain (Phase 5 + 7) -- previously
         # built but never wired in. Shares one storage backend so
@@ -398,6 +402,30 @@ class MarketService:
 
         self._resolve_pending_pattern_predictions(now, prices)
 
+        # Portfolio/Risk Brain -- recomputed on the same cadence,
+        # using all resolved predictions so far. This is what powers
+        # the stop-trading safeguard.
+        try:
+            resolved_history = self.db.history(limit=1000)
+            resolved_history = [r for r in resolved_history if r.get("resolved")]
+            resolved_history.sort(key=lambda r: r.get("ts", 0))
+            self.portfolio_stats = compute_portfolio_stats(resolved_history)
+
+            # Only alert on the TRANSITION into stop-trading, not every
+            # cycle it stays true -- same pattern as regime-change alerts.
+            if self.portfolio_stats["stop_trading"] and not self.last_stop_trading_state:
+                self.alerts.appendleft({
+                    "ts": now,
+                    "title": "⚠️ Risk Brain: Stop-Trading Triggered",
+                    "message": (
+                        f"{self.portfolio_stats['current_streak']} consecutive "
+                        f"losses. Discipline says pause, not force a trade."
+                    ),
+                })
+            self.last_stop_trading_state = self.portfolio_stats["stop_trading"]
+        except Exception as error:
+            print(f"⚠️ Portfolio brain update failed: {error}")
+
 
         self.latest = self.build_live_snapshot(
             prices,
@@ -580,17 +608,42 @@ class MarketService:
 
         # Log each brain's call for future accuracy resolution (cheap
         # write, dedupe isn't needed since these are timestamped facts,
-        # not idempotent state).
+        # not idempotent state). Also captures the market context AT
+        # THIS MOMENT so that if the call turns out wrong, the
+        # Failure Reason Engine can explain WHY -- not just THAT.
         price_now = prices.get(symbol)
         if price_now:
+            call_context = {
+                "price": price_now,
+                "support": analysis.get("support"),
+                "resistance": analysis.get("resistance"),
+                "atr": analysis.get("atr"),
+                "rsi": analysis.get("rsi"),
+                "regime": current_regime,
+                "options_bias": options_data.get("oi_shift_bias") if options_data else None,
+                "news_score": self.latest.get("news_score"),
+            }
+
             for brain_name, vote in brain_votes.items():
                 self.db.add_brain_call(
                     now, symbol, brain_name, 3, price_now,
                     vote["direction"],
                     regime=current_regime,
+                    context=call_context,
                 )
 
         result = combine_adaptive_verdict(symbol, analysis, brain_votes, self.db)
+
+        # Risk Brain override -- this is what makes the stop-trading
+        # rule actually MATTER instead of just being a number on a
+        # dashboard. When active, no verdict from any brain is allowed
+        # to override capital-protection discipline.
+        if self.portfolio_stats.get("stop_trading"):
+            result["direction"] = "NO-TRADE"
+            result["risk_override"] = (
+                f"Stop-trading active: {self.portfolio_stats['current_streak']} "
+                f"consecutive losses. Verdict suppressed by Risk Brain."
+            )
 
         return result
 
@@ -1103,6 +1156,8 @@ class MarketService:
                 symbol: asdict(pa)
                 for symbol, pa in self.pattern_analysis.items()
             },
+
+            "portfolio": self.portfolio_stats,
 
             "news_score": news_score,
             "news": self.news.latest(),
